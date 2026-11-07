@@ -1,0 +1,16 @@
+node_modules/
+android/
+.DS_Store
+Thumbs.db
+*.log
+__pycache__/
+*.pyc
+build/
+DerivedData/
+*.xcworkspace/xcuserdata
+*.xcuserdatad
+*.p8
+*.mobileprovision
+*.cer
+*.ipa
+setup_github_secrets.py

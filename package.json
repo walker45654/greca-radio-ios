@@ -1,0 +1,19 @@
+{
+  "name": "greca-radio-app",
+  "version": "1.0.1",
+  "description": "Greca FM 99.4 Official Mobile App",
+  "main": "index.html",
+  "scripts": {
+    "start": "python server.py"
+  },
+  "author": "Greca FM 99.4",
+  "license": "ISC",
+  "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  },
+  "dependencies": {
+    "@capacitor/ios": "^8.5.3"
+  }
+}

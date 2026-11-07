@@ -1,0 +1,31 @@
+{
+  "name": "Greca FM 99,4",
+  "short_name": "Greca 99,4",
+  "description": "Greca FM 99,4 - Το Ραδιόφωνο της Ηλείας. Live Streaming, 8 Μουσικά Κανάλια, Πρόγραμμα & Μουσικά Νέα.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#D9001B",
+  "icons": [
+    {
+      "src": "https://greca994.gr/wp-content/uploads/2020/06/cropped-greca-1-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://greca994.gr/wp-content/uploads/2020/06/cropped-greca-1-370x370.png",
+      "sizes": "370x370",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://greca994.gr/wp-content/uploads/2020/06/cropped-greca-1-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
