@@ -1032,9 +1032,8 @@ function initGrecaApp() {
 
     for (const q of queries) {
       try {
-        const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=3`);
-        if (res.ok) {
-          const json = await res.json();
+        const json = await fetchUniversalJson(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=3`);
+        if (json) {
           if (json.results && json.results.length > 0) {
             const matched = json.results.find(r => artistMatches(cleanArtist, r.artistName));
             if (matched && matched.artworkUrl100) {
@@ -1412,12 +1411,13 @@ function initGrecaApp() {
   // Bulletproof Universal HTTP Fetcher (Capacitor Native Android + Web)
   // Bypasses all browser CORS restrictions on mobile devices!
   // -----------------------------------------------------------------
-  // -----------------------------------------------------------------
-  // Bulletproof Universal HTTP GET Fetcher (Capacitor Native iOS/Android + Web)
-  // Bypasses all browser CORS restrictions on mobile devices via native URLSession!
+  // Bulletproof Universal HTTP GET Text Fetcher (Capacitor Native iOS/Android + Web)
+  // Bypasses all browser CORS restrictions and avoids iOS URLSession cache traps!
   // -----------------------------------------------------------------
   async function fetchUniversalText(url) {
     if (!url) return null;
+    const sep = url.includes("?") ? "&" : "?";
+    const freshUrl = url.includes("_t=") ? url : `${url}${sep}_t=${Date.now()}`;
 
     // 1. Native CapacitorHttp Plugin (Direct OS URLSession on iOS & HttpURLConnection on Android - 0% CORS)
     try {
@@ -1425,8 +1425,13 @@ function initGrecaApp() {
       const httpPlugin = (typeof window !== "undefined" && window.CapacitorHttp) || (cap && cap.Plugins && cap.Plugins.CapacitorHttp);
       if (httpPlugin && typeof httpPlugin.get === "function") {
         const res = await httpPlugin.get({
-          url: url,
-          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+          url: freshUrl,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          responseType: 'text',
           connectTimeout: 7000,
           readTimeout: 7000
         });
@@ -1438,8 +1443,13 @@ function initGrecaApp() {
         }
       } else if (cap && typeof cap.nativePromise === "function") {
         const res = await cap.nativePromise("CapacitorHttp", "get", {
-          url: url,
-          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+          url: freshUrl,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          responseType: 'text',
           connectTimeout: 7000,
           readTimeout: 7000
         });
@@ -1454,8 +1464,13 @@ function initGrecaApp() {
 
     // 2. Direct Web Fetch
     try {
-      const sep = url.includes("?") ? "&" : "?";
-      const res = await fetch(url + sep + "_t=" + Date.now(), { cache: "no-store" });
+      const res = await fetch(freshUrl, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        cache: "no-store"
+      });
       if (res && res.ok) {
         const text = await res.text();
         if (text && text.trim().length > 0 && !isServerErrorMessage(text)) {
@@ -1468,12 +1483,70 @@ function initGrecaApp() {
   }
 
   // -----------------------------------------------------------------
+  // Bulletproof Universal HTTP GET JSON Fetcher (Direct native URLSession)
+  // -----------------------------------------------------------------
+  async function fetchUniversalJson(url) {
+    if (!url) return null;
+    try {
+      const cap = (typeof window !== "undefined" && window.Capacitor) ? window.Capacitor : null;
+      const httpPlugin = (typeof window !== "undefined" && window.CapacitorHttp) || (cap && cap.Plugins && cap.Plugins.CapacitorHttp);
+      if (httpPlugin && typeof httpPlugin.get === "function") {
+        const res = await httpPlugin.get({
+          url: url,
+          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+          responseType: 'json',
+          connectTimeout: 7000,
+          readTimeout: 7000
+        });
+        if (res && res.data) {
+          if (typeof res.data === "object") return res.data;
+          try { return JSON.parse(res.data); } catch (_) {}
+        }
+      } else if (cap && typeof cap.nativePromise === "function") {
+        const res = await cap.nativePromise("CapacitorHttp", "get", {
+          url: url,
+          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+          responseType: 'json',
+          connectTimeout: 7000,
+          readTimeout: 7000
+        });
+        if (res && res.data) {
+          if (typeof res.data === "object") return res.data;
+          try { return JSON.parse(res.data); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const res = await fetch(url);
+      if (res.ok) return await res.json();
+    } catch (_) {}
+    return null;
+  }
+
+  // -----------------------------------------------------------------
   // Bulletproof Universal HTTP POST Fetcher (Capacitor Native iOS/Android + Web)
   // Bypasses all browser CORS restrictions on mobile devices via native URLSession!
+  // Handles plain JS object for Capacitor Swift plugin URLRequest serialization!
   // -----------------------------------------------------------------
   async function fetchUniversalPost(url, postData) {
     if (!url) return null;
-    const bodyStr = typeof postData === "string" ? postData : new URLSearchParams(postData).toString();
+    let dataObj = {};
+    let bodyStr = "";
+    if (typeof postData === "string") {
+      bodyStr = postData;
+      try {
+        const p = new URLSearchParams(postData);
+        p.forEach((v, k) => { dataObj[k] = v; });
+      } catch (_) {
+        dataObj = postData;
+      }
+    } else if (postData && typeof postData === "object") {
+      dataObj = postData;
+      try {
+        bodyStr = new URLSearchParams(postData).toString();
+      } catch (_) {}
+    }
 
     // 1. Native CapacitorHttp Plugin (Direct OS URLSession on iOS - 0% CORS)
     try {
@@ -1486,9 +1559,10 @@ function initGrecaApp() {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'
           },
-          data: bodyStr,
-          connectTimeout: 7000,
-          readTimeout: 7000
+          data: dataObj,
+          responseType: 'json',
+          connectTimeout: 8000,
+          readTimeout: 8000
         });
         if (res && res.data) {
           if (typeof res.data === "object") return res.data;
@@ -1505,9 +1579,10 @@ function initGrecaApp() {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'
           },
-          data: bodyStr,
-          connectTimeout: 7000,
-          readTimeout: 7000
+          data: dataObj,
+          responseType: 'json',
+          connectTimeout: 8000,
+          readTimeout: 8000
         });
         if (res && res.data) {
           if (typeof res.data === "object") return res.data;
