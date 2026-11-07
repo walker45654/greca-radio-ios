@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="el">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Greca FM 99,4 | Το Ραδιόφωνο της Ηλείας - Official App</title>
-  
+
   <meta name="description" content="Greca FM 99,4 - Live Streaming, Web Radios, Apple CarPlay, Android Auto & Νέα.">
   <link rel="icon" href="https://greca994.gr/wp-content/uploads/2020/06/cropped-greca-1-100x100.png" type="image/png">
   <link rel="manifest" href="manifest.json">
@@ -18,11 +19,13 @@
   <!-- Google Fonts: Outfit & Inter for high-end mobile typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
+
   <link rel="stylesheet" href="style.css?v=97">
 
   <!-- Clean White Splash Screen (Simple Breathing Logo) -->
@@ -41,17 +44,20 @@
       will-change: opacity;
       pointer-events: auto;
     }
+
     .app-splash-screen.splash-dismissed {
       opacity: 0;
       visibility: hidden;
       pointer-events: none !important;
       transition: opacity 0.65s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.65s;
     }
+
     .splash-inner {
       display: flex;
       align-items: center;
       justify-content: center;
     }
+
     .splash-logo-breathe {
       width: 145px;
       height: 145px;
@@ -61,11 +67,13 @@
       box-shadow: none;
       animation: splashLogoBreathe 1.15s ease-in-out infinite alternate;
     }
+
     @keyframes splashLogoBreathe {
       0% {
         transform: scale(0.84);
         opacity: 0.9;
       }
+
       100% {
         transform: scale(1.16);
         opacity: 1;
@@ -74,6 +82,7 @@
   </style>
   <script>window._splashStartTime = Date.now();</script>
 </head>
+
 <body>
 
   <!-- Clean White Animated Splash Screen (Logo Simple Breathe / Scale) -->
@@ -84,12 +93,12 @@
   </div>
   <script>
     // Universal failsafe: Dismiss splash screen automatically after 2600ms to guarantee app entry on any restart
-    setTimeout(function() {
+    setTimeout(function () {
       var sp = document.getElementById("appSplashScreen");
       if (sp && !sp.classList.contains("splash-dismissed")) {
         sp.classList.add("splash-dismissed");
         sp.style.pointerEvents = "none";
-        setTimeout(function() {
+        setTimeout(function () {
           if (sp) {
             sp.style.display = "none";
             if (sp.parentNode) sp.parentNode.removeChild(sp);
@@ -111,14 +120,12 @@
 
     <!-- Main Scrollable Content Area (Stations are First!) -->
     <main class="app-content-scroll" id="mainScroll">
-      <!-- Hardware-accelerated scrollable background (Scrolls naturally to white at bottom) -->
-      <div class="scrollable-bg-layer" aria-hidden="true"></div>
 
       <!-- ==========================================
            TAB 1: LIVE PLAYER & STATIONS (Home)
            ========================================== -->
       <section class="tab-pane active" id="tab-stations">
-        
+
         <!-- TOP WEB RADIOS HORIZONTAL CAROUSEL (Stations are First!) -->
         <div class="stations-carousel-wrapper">
           <div class="carousel-title-row">
@@ -127,10 +134,12 @@
               <span class="carousel-count">8 Σταθμοί</span>
             </div>
             <div class="carousel-nav-arrows">
-              <button class="carousel-arrow-btn" id="bubbleScrollLeftBtn" aria-label="Προηγούμενοι Σταθμοί" title="Scroll Left">
+              <button class="carousel-arrow-btn" id="bubbleScrollLeftBtn" aria-label="Προηγούμενοι Σταθμοί"
+                title="Scroll Left">
                 <i class="fa-solid fa-chevron-left"></i>
               </button>
-              <button class="carousel-arrow-btn" id="bubbleScrollRightBtn" aria-label="Επόμενοι Σταθμοί" title="Scroll Right">
+              <button class="carousel-arrow-btn" id="bubbleScrollRightBtn" aria-label="Επόμενοι Σταθμοί"
+                title="Scroll Right">
                 <i class="fa-solid fa-chevron-right"></i>
               </button>
             </div>
@@ -159,7 +168,8 @@
           </div>
 
           <!-- On Air Program Pill -->
-          <div class="on-air-program-badge" id="mainOnAirBadgeWrap" style="cursor: pointer;" title="Πληροφορίες εκπομπής">
+          <div class="on-air-program-badge" id="mainOnAirBadgeWrap" style="cursor: pointer;"
+            title="Πληροφορίες εκπομπής">
             <i class="fa-solid fa-headphones"></i>
             <span id="currentShowBadge">Greca FM 99,4 • 24/7 Live</span>
           </div>
@@ -167,7 +177,8 @@
           <!-- Volume Slider Bar -->
           <div class="volume-slider-box">
             <i class="fa-solid fa-volume-low"></i>
-            <input type="range" class="volume-range-input" id="mainVolumeSlider" min="0" max="1" step="0.05" value="0.85">
+            <input type="range" class="volume-range-input" id="mainVolumeSlider" min="0" max="1" step="0.05"
+              value="0.85">
             <i class="fa-solid fa-volume-high"></i>
           </div>
 
@@ -186,10 +197,12 @@
         </div>
 
         <!-- FEATURED MORNING SHOW BANNER (Exact same design as in Schedule!) -->
-        <div class="featured-show-card" id="homeMorningShowCard" style="cursor: pointer;" title="Πληροφορίες για το Number One Radio Show">
+        <div class="featured-show-card" id="homeMorningShowCard" style="cursor: pointer;"
+          title="Πληροφορίες για το Number One Radio Show">
           <div class="show-card-banner" id="homeMorningShowBanner">
             <div class="show-card-image-wrap">
-              <img src="assets/shows/konstantaras-kathimerina komeno.jpg" alt="Number One Radio Show" class="show-card-img" loading="lazy">
+              <img src="assets/shows/konstantaras-kathimerina komeno.jpg" alt="Number One Radio Show"
+                class="show-card-img" loading="lazy">
               <div class="show-card-gradient-overlay"></div>
               <div class="show-live-chip" id="homeKonstantarasLiveChip" style="display: none;">
                 <span class="live-dot-pulse"></span>
@@ -213,7 +226,8 @@
         <div class="recently-played-section">
           <div class="section-heading-bar">
             <h3>Τελευταία Τραγούδια</h3>
-            <span class="filter-count-chip" id="recentHistoryStationBadge"><i class="fa-solid fa-clock-rotate-left"></i> Greca FM 99,4</span>
+            <span class="filter-count-chip" id="recentHistoryStationBadge"><i class="fa-solid fa-clock-rotate-left"></i>
+              Greca FM 99,4</span>
           </div>
 
           <div class="recent-tracks-list" id="recentTracksList">
@@ -318,27 +332,32 @@
         <div class="news-filter-bar-wrapper">
           <div class="news-filter-nav-row" id="newsFilterNavRow">
             <button class="news-filter-pill active" data-filter="all">Όλα</button>
-            <button class="news-filter-pill" data-filter="89"><i class="fa-solid fa-star"></i> Πρώτες Μεταδόσεις</button>
+            <button class="news-filter-pill" data-filter="89"><i class="fa-solid fa-star"></i> Πρώτες
+              Μεταδόσεις</button>
             <button class="news-filter-pill" data-filter="3"><i class="fa-solid fa-music"></i> Μουσικά Νέα</button>
           </div>
         </div>
 
         <!-- Top Pagination (1 - 2 - 3 quick switcher) -->
         <div class="news-pagination-bar news-pagination-top" id="newsPaginationTop" style="display: none;">
-          <button class="news-page-nav-btn news-page-prev-btn" id="newsTopPrevBtn" aria-label="Προηγούμενη σελίδα" title="Προηγούμενη σελίδα">
+          <button class="news-page-nav-btn news-page-prev-btn" id="newsTopPrevBtn" aria-label="Προηγούμενη σελίδα"
+            title="Προηγούμενη σελίδα">
             <i class="fa-solid fa-chevron-left"></i>
           </button>
           <div class="news-page-numbers-wrap" id="newsTopNumbersWrap">
             <!-- Dynamically populated page buttons 1, 2, 3 -->
           </div>
-          <button class="news-page-nav-btn news-page-next-btn" id="newsTopNextBtn" aria-label="Επόμενη σελίδα" title="Επόμενη σελίδα">
+          <button class="news-page-nav-btn news-page-next-btn" id="newsTopNextBtn" aria-label="Επόμενη σελίδα"
+            title="Επόμενη σελίδα">
             <i class="fa-solid fa-chevron-right"></i>
           </button>
         </div>
 
         <div class="news-feed-wrapper" id="newsFeedWrapper">
-          <div class="news-loading-state" id="newsLoadingIndicator" style="text-align: center; padding: 60px 20px; color: #ffffff;">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 34px; color: #ffffff; margin-bottom: 14px; display: inline-block;"></i>
+          <div class="news-loading-state" id="newsLoadingIndicator"
+            style="text-align: center; padding: 60px 20px; color: #ffffff;">
+            <i class="fa-solid fa-circle-notch fa-spin"
+              style="font-size: 34px; color: #ffffff; margin-bottom: 14px; display: inline-block;"></i>
             <p style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 6px;">Φόρτωση άρθρων...</p>
             <span style="font-size: 13px; color: rgba(255, 255, 255, 0.85);">Συγχρονισμός με greca994.gr</span>
           </div>
@@ -388,7 +407,8 @@
                   <i class="fa-solid fa-envelope dept-icon"></i>
                   <span>sales@greca994.gr</span>
                 </a>
-                <a href="https://wa.me/306975266929" target="_blank" rel="noopener noreferrer" class="dept-contact-link" title="WhatsApp Διαφημιστικού">
+                <a href="https://wa.me/306975266929" target="_blank" rel="noopener noreferrer" class="dept-contact-link"
+                  title="WhatsApp Διαφημιστικού">
                   <i class="fa-brands fa-whatsapp dept-icon"></i>
                   <span>+306975266929</span>
                 </a>
@@ -407,7 +427,8 @@
                   <i class="fa-solid fa-envelope dept-icon"></i>
                   <span>songs@greca994.gr</span>
                 </a>
-                <a href="https://wa.me/306975266929" target="_blank" rel="noopener noreferrer" class="dept-contact-link" title="WhatsApp Διευθυντή">
+                <a href="https://wa.me/306975266929" target="_blank" rel="noopener noreferrer" class="dept-contact-link"
+                  title="WhatsApp Διευθυντή">
                   <i class="fa-brands fa-whatsapp dept-icon"></i>
                   <span>+306975266929</span>
                 </a>
@@ -422,23 +443,28 @@
           <h4>Ακολουθήστε τον Greca 99,4</h4>
           <p>Μείνετε συντονισμένοι στα επίσημα social media του σταθμού</p>
           <div class="contact-social-icons-row">
-            <a href="https://www.facebook.com/profile.php?id=100063598448830" target="_blank" rel="noopener noreferrer" class="contact-social-btn fb" aria-label="Facebook">
+            <a href="https://www.facebook.com/profile.php?id=100063598448830" target="_blank" rel="noopener noreferrer"
+              class="contact-social-btn fb" aria-label="Facebook">
               <i class="fa-brands fa-facebook-f"></i>
               <span>Facebook</span>
             </a>
-            <a href="https://www.instagram.com/grecafm994/" target="_blank" rel="noopener noreferrer" class="contact-social-btn ig" aria-label="Instagram">
+            <a href="https://www.instagram.com/grecafm994/" target="_blank" rel="noopener noreferrer"
+              class="contact-social-btn ig" aria-label="Instagram">
               <i class="fa-brands fa-instagram"></i>
               <span>Instagram</span>
             </a>
-            <a href="https://www.youtube.com/user/grecafm" target="_blank" rel="noopener noreferrer" class="contact-social-btn yt" aria-label="YouTube">
+            <a href="https://www.youtube.com/user/grecafm" target="_blank" rel="noopener noreferrer"
+              class="contact-social-btn yt" aria-label="YouTube">
               <i class="fa-brands fa-youtube"></i>
               <span>YouTube</span>
             </a>
-            <a href="https://twitter.com/grecafm994" target="_blank" rel="noopener noreferrer" class="contact-social-btn x-tw" aria-label="X Twitter">
+            <a href="https://twitter.com/grecafm994" target="_blank" rel="noopener noreferrer"
+              class="contact-social-btn x-tw" aria-label="X Twitter">
               <i class="fa-brands fa-x-twitter"></i>
               <span>Twitter</span>
             </a>
-            <a href="https://greca994.gr" target="_blank" rel="noopener noreferrer" class="contact-social-btn web" aria-label="Ιστοσελίδα">
+            <a href="https://greca994.gr" target="_blank" rel="noopener noreferrer" class="contact-social-btn web"
+              aria-label="Ιστοσελίδα">
               <i class="fa-solid fa-globe"></i>
               <span>greca994.gr</span>
             </a>
@@ -471,9 +497,12 @@
           </div>
 
           <div class="cp-driver-controls">
-            <button class="cp-ctrl-btn" id="cpPrevChannel" title="Προηγούμενος Σταθμός"><i class="fa-solid fa-backward-step"></i></button>
-            <button class="cp-ctrl-btn cp-play-huge" id="cpMainPlayBtn" title="Play / Pause"><i class="fa-solid fa-play"></i></button>
-            <button class="cp-ctrl-btn" id="cpNextChannel" title="Επόμενος Σταθμός"><i class="fa-solid fa-forward-step"></i></button>
+            <button class="cp-ctrl-btn" id="cpPrevChannel" title="Προηγούμενος Σταθμός"><i
+                class="fa-solid fa-backward-step"></i></button>
+            <button class="cp-ctrl-btn cp-play-huge" id="cpMainPlayBtn" title="Play / Pause"><i
+                class="fa-solid fa-play"></i></button>
+            <button class="cp-ctrl-btn" id="cpNextChannel" title="Επόμενος Σταθμός"><i
+                class="fa-solid fa-forward-step"></i></button>
           </div>
 
           <div class="cp-stations-nav-title">
@@ -549,7 +578,7 @@
           <div class="show-modal-hero">
             <img id="modalShowImg" src="" alt="Show image" class="show-modal-hero-img" />
             <div class="show-modal-hero-gradient"></div>
-            
+
             <div class="show-modal-hero-content">
               <span class="show-tag-box" id="modalShowTag">GOSSIP</span>
               <h2 class="show-modal-title" id="modalShowTitle">NUMBER ONE RADIO SHOW</h2>
@@ -587,7 +616,7 @@
           <div class="show-modal-hero">
             <img id="modalArticleImg" src="" alt="Article image" class="show-modal-hero-img" />
             <div class="show-modal-hero-gradient"></div>
-            
+
             <div class="show-modal-hero-content">
               <span class="show-tag-box" id="modalArticleTag">ΜΟΥΣΙΚΑ ΝΕΑ</span>
               <h2 class="show-modal-title" id="modalArticleTitle"></h2>
@@ -607,7 +636,8 @@
             </div>
 
             <div class="article-modal-actions-row">
-              <a id="modalArticleWebLink" href="https://greca994.gr" target="_blank" rel="noopener noreferrer" class="article-web-btn">
+              <a id="modalArticleWebLink" href="https://greca994.gr" target="_blank" rel="noopener noreferrer"
+                class="article-web-btn">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i>
                 <span>Άνοιγμα στο greca994.gr</span>
               </a>
@@ -627,4 +657,5 @@
   <script src="stations-data.js?v=97"></script>
   <script src="app.js?v=97"></script>
 </body>
+
 </html>
