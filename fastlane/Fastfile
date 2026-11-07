@@ -25,19 +25,22 @@ platform :ios do
       lock_when_sleeps: false
     )
 
-    # 1. Import permanent Apple Distribution Certificate & Private Key (.p12)
-    p12_path = File.expand_path("distribution.p12")
-    File.write(p12_path, Base64.decode64(ENV["APPLE_CERTIFICATE_P12_BASE64"]))
+    # 1. Import Apple WWDR Intermediate CA, Private Key & Certificate
+    sh("curl -fsSL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer -o AppleWWDRCAG3.cer && security import AppleWWDRCAG3.cer -k #{keychain_path} -T /usr/bin/codesign -T /usr/bin/security")
 
-    import_certificate(
-      certificate_path: p12_path,
-      certificate_password: ENV["APPLE_CERTIFICATE_PASSWORD"],
-      keychain_name: keychain_name,
-      keychain_password: keychain_password
-    )
+    key_path = File.expand_path("distribution_key.pem")
+    cert_path = File.expand_path("distribution_cert.cer")
+    File.write(key_path, ENV["APPLE_CERTIFICATE_KEY_PEM"])
+    File.write(cert_path, Base64.decode64(ENV["APPLE_CERTIFICATE_CER_BASE64"]))
 
-    # Allow codesign to access the private key without interactive prompts
+    sh("security import #{key_path} -k #{keychain_path} -P '' -T /usr/bin/codesign -T /usr/bin/security")
+    sh("security import #{cert_path} -k #{keychain_path} -T /usr/bin/codesign -T /usr/bin/security")
+
+    # Authorize codesign to access private keys in the keychain
     sh("security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k #{keychain_password} #{keychain_path}")
+
+    # Verify that the identity is valid and recognized by codesign
+    sh("security find-identity -v -p codesigning #{keychain_path}")
 
     # 2. Fetch or generate App Store Provisioning Profile linked to our certificate
     get_provisioning_profile(
