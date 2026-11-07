@@ -3,6 +3,10 @@
   "appName": "Greca FM 99.4",
   "webDir": "www",
   "bundledWebRuntime": false,
+  "ios": {
+    "backgroundColor": "#0A0314",
+    "scrollEnabled": true
+  },
   "android": {
     "allowMixedContent": true
   },

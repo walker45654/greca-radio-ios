@@ -1,4 +1,4 @@
-$src = 'c:\Users\user\.gemini\antigravity-ide\scratch\greca-radio-app'
+$src = $PSScriptRoot
 $desktop = 'C:\Users\user\Desktop\greca app'
 $zipPath = 'C:\Users\user\Desktop\greca-app.zip'
 

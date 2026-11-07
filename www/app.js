@@ -2146,71 +2146,80 @@ function initGrecaApp() {
         updateChartPreviewUI();
       }
 
-      // Pause current audio cleanly without stripping src or calling empty load()
+      if (audioSwitchTimeout) {
+        clearTimeout(audioSwitchTimeout);
+        audioSwitchTimeout = null;
+      }
+      if (bufferTimeout) {
+        clearTimeout(bufferTimeout);
+        bufferTimeout = null;
+      }
+
+      // Pause current audio cleanly
       try { audio.pause(); } catch (e) {}
 
-      // Debounce stream attachment so rapid station changes do not crash Android MediaPlayer
-      audioSwitchTimeout = setTimeout(() => {
-        if (thisTuneId !== currentTuneId) return;
-
-        // Directly attach new stream URL
+      // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
+      if (audio.src !== channel.streamUrl) {
         audio.src = channel.streamUrl;
-        isSwitchingStation = false;
+        try { audio.load(); } catch (e) {}
+      }
+      isSwitchingStation = false;
 
-        // Safety buffer watchdog: if stream doesn't play within 6s, cleanly recover UI
-        bufferTimeout = setTimeout(() => {
-          if (thisTuneId === currentTuneId && isBuffering) {
-            if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
-              console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
-              audio.src = channel.backupStreamUrl;
-              audio.play().catch(() => {});
-            } else {
-              console.warn("Playback buffering timed out, recovering play state");
-              isBuffering = false;
-              if (audio.paused) {
-                isPlaying = false;
-              }
-              updatePlayStateUI();
-            }
-          }
-        }, 6000);
-
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            if (thisTuneId !== currentTuneId) return;
+      // Safety buffer watchdog: if stream doesn't play within 6s, cleanly recover UI
+      bufferTimeout = setTimeout(() => {
+        if (thisTuneId === currentTuneId && isBuffering) {
+          if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
+            console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
+            audio.src = channel.backupStreamUrl;
+            try { audio.load(); } catch (e) {}
+            audio.play().catch(() => {});
+          } else {
+            console.warn("Playback buffering timed out, recovering play state");
             isBuffering = false;
-            isPlaying = true;
-            if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
-            updatePlayStateUI();
-          }).catch(err => {
-            if (thisTuneId !== currentTuneId) return;
-            if (err && err.name === "AbortError") {
-              return; // Expected when rapidly interrupted by another station switch
+            if (audio.paused) {
+              isPlaying = false;
             }
-            console.warn("Stream playback rejected:", err);
-            if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
-              audio.src = channel.backupStreamUrl;
-              audio.play().then(() => {
-                if (thisTuneId !== currentTuneId) return;
-                isBuffering = false;
-                isPlaying = true;
-                if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
-                updatePlayStateUI();
-              }).catch(() => {
-                if (thisTuneId !== currentTuneId) return;
-                isBuffering = false;
-                isPlaying = false;
-                updatePlayStateUI();
-              });
-            } else {
+            updatePlayStateUI();
+          }
+        }
+      }, 6000);
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          if (thisTuneId !== currentTuneId) return;
+          isBuffering = false;
+          isPlaying = true;
+          if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
+          updatePlayStateUI();
+        }).catch(err => {
+          if (thisTuneId !== currentTuneId) return;
+          if (err && err.name === "AbortError") {
+            return; // Expected when rapidly interrupted by another station switch
+          }
+          console.warn("Stream playback rejected:", err);
+          if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
+            audio.src = channel.backupStreamUrl;
+            try { audio.load(); } catch (e) {}
+            audio.play().then(() => {
+              if (thisTuneId !== currentTuneId) return;
+              isBuffering = false;
+              isPlaying = true;
+              if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
+              updatePlayStateUI();
+            }).catch(() => {
+              if (thisTuneId !== currentTuneId) return;
               isBuffering = false;
               isPlaying = false;
               updatePlayStateUI();
-            }
-          });
-        }
-      }, 120);
+            });
+          } else {
+            isBuffering = false;
+            isPlaying = false;
+            updatePlayStateUI();
+          }
+        });
+      }
     } else {
       isSwitchingStation = false;
       try { audio.pause(); } catch (e) {}

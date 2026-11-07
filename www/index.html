@@ -2,7 +2,7 @@
 <html lang="el">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>Greca FM 99,4 | Το Ραδιόφωνο της Ηλείας - Official App</title>
   
   <meta name="description" content="Greca FM 99,4 - Live Streaming, Web Radios, Apple CarPlay, Android Auto & Νέα.">
@@ -23,7 +23,7 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   
-  <link rel="stylesheet" href="style.css?v=96">
+  <link rel="stylesheet" href="style.css?v=97">
 
   <!-- Clean White Splash Screen (Simple Breathing Logo) -->
   <style id="splashStyles">
@@ -101,6 +101,8 @@
 
   <!-- App Main Viewport (Clean Edge-to-Edge Mobile Container) -->
   <div class="app-viewport" id="appViewport">
+    <!-- Dedicated GPU-accelerated backdrop layer (Zero scroll jank / No white overscroll) -->
+    <div class="app-bg-backdrop" aria-hidden="true"></div>
 
     <!-- Sleek Top Executive Notification Pill -->
     <div class="toast-msg" id="toastMsg" role="alert" aria-live="polite">
@@ -618,11 +620,11 @@
 
 
     <!-- Hidden HTML5 Audio Element -->
-    <audio id="audioStream" preload="metadata"></audio>
+    <audio id="audioStream" preload="auto" playsinline></audio>
 
   </div>
 
-  <script src="stations-data.js?v=96"></script>
-  <script src="app.js?v=96"></script>
+  <script src="stations-data.js?v=97"></script>
+  <script src="app.js?v=97"></script>
 </body>
 </html>
