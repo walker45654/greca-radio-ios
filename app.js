@@ -1412,40 +1412,37 @@ function initGrecaApp() {
   // Bulletproof Universal HTTP Fetcher (Capacitor Native Android + Web)
   // Bypasses all browser CORS restrictions on mobile devices!
   // -----------------------------------------------------------------
+  // -----------------------------------------------------------------
+  // Bulletproof Universal HTTP GET Fetcher (Capacitor Native iOS/Android + Web)
+  // Bypasses all browser CORS restrictions on mobile devices via native URLSession!
+  // -----------------------------------------------------------------
   async function fetchUniversalText(url) {
     if (!url) return null;
 
-    // 1. Native Android Plugin (Direct Java HttpURLConnection - 0% CORS, 100% SUCCESS)
+    // 1. Native CapacitorHttp Plugin (Direct OS URLSession on iOS & HttpURLConnection on Android - 0% CORS)
     try {
       const cap = (typeof window !== "undefined" && window.Capacitor) ? window.Capacitor : null;
-      if (cap && cap.Plugins && cap.Plugins.NativeMediaSession && typeof cap.Plugins.NativeMediaSession.httpGet === "function") {
-        const res = await cap.Plugins.NativeMediaSession.httpGet({ url: url });
-        if (res && res.data && typeof res.data === "string" && res.data.trim().length > 0 && !isServerErrorMessage(res.data)) {
-          return res.data;
+      const httpPlugin = (typeof window !== "undefined" && window.CapacitorHttp) || (cap && cap.Plugins && cap.Plugins.CapacitorHttp);
+      if (httpPlugin && typeof httpPlugin.get === "function") {
+        const res = await httpPlugin.get({
+          url: url,
+          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+          connectTimeout: 7000,
+          readTimeout: 7000
+        });
+        if (res && res.data) {
+          const content = typeof res.data === "string" ? res.data : (typeof res.data === "object" ? JSON.stringify(res.data) : String(res.data));
+          if (content && content.trim().length > 0 && !isServerErrorMessage(content)) {
+            return content;
+          }
         }
-      }
-    } catch (nativeErr) {}
-
-    // 2. Native Capacitor Android Plugin (Fallback)
-    try {
-      const cap = (typeof window !== "undefined" && window.Capacitor) ? window.Capacitor : null;
-      if (cap) {
-        let res = null;
-        if (cap.Plugins && cap.Plugins.CapacitorHttp && typeof cap.Plugins.CapacitorHttp.get === "function") {
-          res = await cap.Plugins.CapacitorHttp.get({
-            url: url,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)' },
-            connectTimeout: 5000,
-            readTimeout: 5000
-          });
-        } else if (typeof cap.nativePromise === "function") {
-          res = await cap.nativePromise("CapacitorHttp", "get", {
-            url: url,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)' },
-            connectTimeout: 5000,
-            readTimeout: 5000
-          });
-        }
+      } else if (cap && typeof cap.nativePromise === "function") {
+        const res = await cap.nativePromise("CapacitorHttp", "get", {
+          url: url,
+          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+          connectTimeout: 7000,
+          readTimeout: 7000
+        });
         if (res && res.data) {
           const content = typeof res.data === "string" ? res.data : (typeof res.data === "object" ? JSON.stringify(res.data) : String(res.data));
           if (content && content.trim().length > 0 && !isServerErrorMessage(content)) {
@@ -1453,9 +1450,9 @@ function initGrecaApp() {
           }
         }
       }
-    } catch (capErr) {}
+    } catch (httpErr) {}
 
-    // 3. Direct Web Fetch (Works on localhost, same-origin, or when server allows CORS)
+    // 2. Direct Web Fetch
     try {
       const sep = url.includes("?") ? "&" : "?";
       const res = await fetch(url + sep + "_t=" + Date.now(), { cache: "no-store" });
@@ -1467,78 +1464,51 @@ function initGrecaApp() {
       }
     } catch (webErr) {}
 
-    // 4. Fallback CORS Proxy for Web/iOS/iPad browser if direct cross-origin request is blocked
-    try {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxyUrl, { cache: "no-store" });
-      if (res && res.ok) {
-        const text = await res.text();
-        if (text && text.trim().length > 0 && !isServerErrorMessage(text)) {
-          return text;
-        }
-      }
-    } catch (proxyErr) {}
-
     return null;
   }
 
   // -----------------------------------------------------------------
-  // Bulletproof Universal HTTP POST Fetcher (Capacitor Native Android + Web)
-  // Bypasses all browser CORS restrictions on mobile devices!
+  // Bulletproof Universal HTTP POST Fetcher (Capacitor Native iOS/Android + Web)
+  // Bypasses all browser CORS restrictions on mobile devices via native URLSession!
   // -----------------------------------------------------------------
   async function fetchUniversalPost(url, postData) {
     if (!url) return null;
     const bodyStr = typeof postData === "string" ? postData : new URLSearchParams(postData).toString();
 
-    // 1. Native Android Plugin (Direct Java HttpURLConnection - 0% CORS, 100% SUCCESS)
+    // 1. Native CapacitorHttp Plugin (Direct OS URLSession on iOS - 0% CORS)
     try {
       const cap = (typeof window !== "undefined" && window.Capacitor) ? window.Capacitor : null;
-      if (cap) {
-        let res = null;
-        if (cap.Plugins && cap.Plugins.NativeMediaSession && typeof cap.Plugins.NativeMediaSession.httpPost === "function") {
-          res = await cap.Plugins.NativeMediaSession.httpPost({ url: url, data: bodyStr });
-        } else if (typeof cap.nativePromise === "function") {
-          res = await cap.nativePromise("NativeMediaSession", "httpPost", { url: url, data: bodyStr });
-        }
+      const httpPlugin = (typeof window !== "undefined" && window.CapacitorHttp) || (cap && cap.Plugins && cap.Plugins.CapacitorHttp);
+      if (httpPlugin && typeof httpPlugin.post === "function") {
+        const res = await httpPlugin.post({
+          url: url,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'
+          },
+          data: bodyStr,
+          connectTimeout: 7000,
+          readTimeout: 7000
+        });
         if (res && res.data) {
           if (typeof res.data === "object") return res.data;
           try {
-            return JSON.parse(typeof res.data === "string" ? res.data.trim() : res.data);
+            return JSON.parse(res.data);
           } catch (_) {
             return res.data;
           }
         }
-      }
-    } catch (nativeErr) {}
-
-    // 2. Native Capacitor Android Plugin (Fallback)
-    try {
-      const cap = (typeof window !== "undefined" && window.Capacitor) ? window.Capacitor : null;
-      if (cap) {
-        let res = null;
-        if (cap.Plugins && cap.Plugins.CapacitorHttp && typeof cap.Plugins.CapacitorHttp.post === "function") {
-          res = await cap.Plugins.CapacitorHttp.post({
-            url: url,
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)'
-            },
-            data: bodyStr,
-            connectTimeout: 6000,
-            readTimeout: 6000
-          });
-        } else if (typeof cap.nativePromise === "function") {
-          res = await cap.nativePromise("CapacitorHttp", "post", {
-            url: url,
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile)'
-            },
-            data: bodyStr,
-            connectTimeout: 6000,
-            readTimeout: 6000
-          });
-        }
+      } else if (cap && typeof cap.nativePromise === "function") {
+        const res = await cap.nativePromise("CapacitorHttp", "post", {
+          url: url,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'
+          },
+          data: bodyStr,
+          connectTimeout: 7000,
+          readTimeout: 7000
+        });
         if (res && res.data) {
           if (typeof res.data === "object") return res.data;
           try {
@@ -1548,9 +1518,9 @@ function initGrecaApp() {
           }
         }
       }
-    } catch (capErr) {}
+    } catch (httpErr) {}
 
-    // 3. Direct Web Fetch (Works on same-origin or localhost or if CORS allowed)
+    // 2. Direct Web Fetch
     try {
       const res = await fetch(url, {
         method: "POST",

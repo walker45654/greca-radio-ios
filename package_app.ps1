@@ -3,7 +3,7 @@ $desktop = 'C:\Users\user\Desktop\greca app'
 $zipPath = 'C:\Users\user\Desktop\greca-app.zip'
 
 Write-Host "Copying files to www..."
-Copy-Item -Path "$src\index.html", "$src\style.css", "$src\app.js", "$src\stations-data.js", "$src\top30_data.json", "$src\server_station_history.json", "$src\manifest.json", "$src\sw.js" -Destination "$src\www" -Force
+Copy-Item -Path "$src\index.html", "$src\style.css", "$src\app.js", "$src\stations-data.js", "$src\top30_data.json", "$src\server_station_history.json", "$src\manifest.json", "$src\sw.js", "$src\capacitor.js" -Destination "$src\www" -Force
 if (Test-Path "$src\assets") { Copy-Item -Path "$src\assets" -Destination "$src\www" -Recurse -Force }
 
 Write-Host "Copying files to Android assets..."
@@ -13,7 +13,7 @@ Copy-Item -Path "$src\capacitor.config.json" -Destination "$src\android\app\src\
 
 Write-Host "Copying files to iOS public..."
 if (Test-Path "$src\ios\App\App\public") {
-    Copy-Item -Path "$src\index.html", "$src\style.css", "$src\app.js", "$src\stations-data.js", "$src\top30_data.json", "$src\server_station_history.json", "$src\manifest.json", "$src\sw.js" -Destination "$src\ios\App\App\public" -Force
+    Copy-Item -Path "$src\index.html", "$src\style.css", "$src\app.js", "$src\stations-data.js", "$src\top30_data.json", "$src\server_station_history.json", "$src\manifest.json", "$src\sw.js", "$src\capacitor.js" -Destination "$src\ios\App\App\public" -Force
     if (Test-Path "$src\assets") { Copy-Item -Path "$src\assets" -Destination "$src\ios\App\App\public" -Recurse -Force }
     Copy-Item -Path "$src\capacitor.config.json" -Destination "$src\ios\App\App\capacitor.config.json" -Force
 }
