@@ -101,9 +101,6 @@
 
   <!-- App Main Viewport (Clean Edge-to-Edge Mobile Container) -->
   <div class="app-viewport" id="appViewport">
-    <!-- Dedicated GPU-accelerated backdrop layer (Zero scroll jank / No white overscroll) -->
-    <div class="app-bg-backdrop" aria-hidden="true"></div>
-
     <!-- Sleek Top Executive Notification Pill -->
     <div class="toast-msg" id="toastMsg" role="alert" aria-live="polite">
       <span class="toast-badge-icon" id="toastIconWrap">
@@ -114,6 +111,8 @@
 
     <!-- Main Scrollable Content Area (Stations are First!) -->
     <main class="app-content-scroll" id="mainScroll">
+      <!-- Hardware-accelerated scrollable background (Scrolls naturally to white at bottom) -->
+      <div class="scrollable-bg-layer" aria-hidden="true"></div>
 
       <!-- ==========================================
            TAB 1: LIVE PLAYER & STATIONS (Home)
