@@ -41,14 +41,8 @@ platform :ios do
       app_identifier: "gr.greca994.radio"
     )
 
-    profile_path = ENV["SIGH_PROFILE_PATH"]
-    profile_uuid = ENV["SIGH_UUID"]
-    profile_name = ENV["SIGH_NAME"] || "gr.greca994.radio AppStore"
-
-    # Install the provisioning profile into Xcode's provisioning directory
-    sh("mkdir -p ~/Library/MobileDevice/Provisioning\\ Profiles")
-    sh("cp \"#{profile_path}\" ~/Library/MobileDevice/Provisioning\\ Profiles/#{profile_uuid}.mobileprovision")
-    sh("cp \"#{profile_path}\" ~/Library/MobileDevice/Provisioning\\ Profiles/\"#{profile_name}.mobileprovision\"")
+    profile_name = lane_context[SharedValues::SIGH_NAME]
+    profile_uuid = lane_context[SharedValues::SIGH_UUID]
 
     # 3. Configure code signing with the fetched profile
     update_code_signing_settings(
@@ -70,7 +64,7 @@ platform :ios do
       export_options: {
         signingStyle: "manual",
         provisioningProfiles: {
-          "gr.greca994.radio" => profile_uuid
+          "gr.greca994.radio" => profile_name
         }
       },
       xcargs: "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=\"Apple Distribution\" DEVELOPMENT_TEAM=KAXY5WY64B",
