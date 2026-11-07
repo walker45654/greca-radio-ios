@@ -8,7 +8,7 @@ on:
 jobs:
   build_ios:
     name: Build & Upload to App Store
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 45
 
     steps:

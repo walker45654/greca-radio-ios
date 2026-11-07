@@ -12,8 +12,9 @@ platform :ios do
 
     keychain_name = "fastlane_tmp_keychain"
     keychain_password = "temporary_build_password_123"
+    keychain_path = File.expand_path("~/Library/Keychains/#{keychain_name}-db")
 
-    delete_keychain(name: keychain_name) if File.exist?(File.expand_path("~/Library/Keychains/#{keychain_name}-db"))
+    delete_keychain(name: keychain_name) if File.exist?(keychain_path)
 
     create_keychain(
       name: keychain_name,
@@ -28,9 +29,12 @@ platform :ios do
     get_certificates(
       api_key: api_key,
       type: "distribution",
-      keychain_name: keychain_name,
+      keychain_path: keychain_path,
       keychain_password: keychain_password
     )
+
+    # Allow codesign to access the private key without interactive prompts
+    sh("security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k #{keychain_password} #{keychain_path}")
 
     # 2. Fetch or create App Store Provisioning Profile
     get_provisioning_profile(
@@ -39,13 +43,15 @@ platform :ios do
       type: "appstore"
     )
 
+    profile_name = ENV["sigh_gr.greca994.radio_appstore_profile-name"]
+
     # 3. Configure code signing with the fetched profile
     update_code_signing_settings(
       path: "ios/App/App.xcodeproj",
       use_automatic_signing: false,
       team_id: "KAXY5WY64B",
       bundle_identifier: "gr.greca994.radio",
-      profile_name: ENV["sigh_gr.greca994.radio_appstore_profile-name"],
+      profile_name: profile_name,
       code_sign_identity: "Apple Distribution"
     )
 
@@ -55,6 +61,12 @@ platform :ios do
       scheme: "App",
       configuration: "Release",
       export_method: "app-store",
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "gr.greca994.radio" => profile_name
+        }
+      },
       output_directory: "build/ipa",
       output_name: "GrecaFM.ipa"
     )
