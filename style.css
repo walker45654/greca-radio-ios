@@ -523,16 +523,87 @@ html, body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 10px;
+  padding: 4px 10px;
   margin-bottom: 18px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.volume-slider-box i {
+  cursor: pointer;
+  padding: 8px 4px;
+  font-size: 16px;
+  transition: color 0.15s ease, transform 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.volume-slider-box i:active {
+  transform: scale(0.88);
+  color: var(--greca-red);
 }
 
 .volume-range-input {
   flex: 1;
-  accent-color: var(--greca-red);
-  height: 5px;
+  height: 38px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-x;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Track */
+.volume-range-input::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(to right, var(--greca-red) 0%, var(--greca-red) var(--volume-pct, 85%), #E2E8F0 var(--volume-pct, 85%), #E2E8F0 100%);
+  border-radius: 999px;
+  border: none;
+}
+
+.volume-range-input::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(to right, var(--greca-red) 0%, var(--greca-red) var(--volume-pct, 85%), #E2E8F0 var(--volume-pct, 85%), #E2E8F0 100%);
+  border-radius: 999px;
+  border: none;
+}
+
+/* Thumb */
+.volume-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--greca-red);
+  margin-top: -9px;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 2px 8px rgba(217, 0, 27, 0.4), 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.volume-range-input:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 3px 12px rgba(217, 0, 27, 0.6);
+}
+
+.volume-range-input::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--greca-red);
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 2px 8px rgba(217, 0, 27, 0.4), 0 1px 3px rgba(0, 0, 0, 0.2);
   cursor: pointer;
 }
 

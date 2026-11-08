@@ -35,7 +35,7 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="style.css?v=115">
+  <link rel="stylesheet" href="style.css?v=116">
 
   <!-- Clean White Splash Screen (Simple Breathing Logo) -->
   <style id="splashStyles">
@@ -185,10 +185,10 @@
 
           <!-- Volume Slider Bar -->
           <div class="volume-slider-box">
-            <i class="fa-solid fa-volume-low"></i>
-            <input type="range" class="volume-range-input" id="mainVolumeSlider" min="0" max="1" step="0.05"
-              value="0.85">
-            <i class="fa-solid fa-volume-high"></i>
+            <i class="fa-solid fa-volume-low" id="volDownIcon" role="button" aria-label="Χαμήλωμα / Σίγαση" title="Σίγαση"></i>
+            <input type="range" class="volume-range-input" id="mainVolumeSlider" min="0" max="1" step="0.01"
+              value="0.85" aria-label="Ένταση ήχου">
+            <i class="fa-solid fa-volume-high" id="volUpIcon" role="button" aria-label="Μέγιστη ένταση" title="Μέγιστη ένταση"></i>
           </div>
 
           <!-- Quick Action Buttons -->
@@ -664,7 +664,7 @@
 
   <script src="capacitor.js"></script>
   <script src="stations-data.js?v=97"></script>
-  <script src="app.js?v=115"></script>
+  <script src="app.js?v=116"></script>
 </body>
 
 </html>

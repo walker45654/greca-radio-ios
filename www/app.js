@@ -187,6 +187,20 @@ function initGrecaApp() {
   let sleepIntervalHandle = null;
   let sleepOriginalVolume = 0.85;
 
+  // Master Volume State with Persistent Storage
+  let currentAppVolume = 0.85;
+  let previousAppVolume = 0.85;
+  try {
+    const savedVol = localStorage.getItem("greca_app_volume");
+    if (savedVol !== null) {
+      const parsed = parseFloat(savedVol);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        currentAppVolume = parsed;
+        previousAppVolume = parsed > 0 ? parsed : 0.85;
+      }
+    }
+  } catch (_) {}
+
   // Safe DOM Elements
   const mainScroll = document.getElementById("mainScroll");
   const stationsBubbleRow = document.getElementById("stationsBubbleRow");
@@ -2218,6 +2232,8 @@ function initGrecaApp() {
       // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
       // Always attach fresh live URL with timestamp so AVPlayer reconnects directly to the real-time LIVE broadcast (never resumes stale paused buffer!)
       audio.preload = "auto";
+      audio.volume = currentAppVolume;
+      audio.muted = (currentAppVolume === 0);
       audio.src = getLiveStreamUrl(channel.streamUrl);
       try { audio.load(); } catch (e) {}
       isSwitchingStation = false;
@@ -3354,6 +3370,8 @@ function initGrecaApp() {
     const a = new Audio();
     activePreviewAudio = a;
     a.preload = "auto";
+    a.volume = currentAppVolume;
+    a.muted = (currentAppVolume === 0);
     a.src = track.audio;
 
     // 5. Only transition to "playing" when audio ACTUALLY begins playback with real buffered frames
@@ -3760,11 +3778,116 @@ function initGrecaApp() {
     });
   }
 
-  if (mainVolumeSlider) {
-    mainVolumeSlider.addEventListener("input", (e) => {
-      audio.volume = parseFloat(e.target.value);
-    });
+  function setAppVolume(vol, updateSlider = true) {
+    const clamped = Math.max(0, Math.min(1, typeof vol === "number" && !isNaN(vol) ? vol : 0.85));
+    currentAppVolume = clamped;
+
+    if (audio) {
+      audio.volume = clamped;
+      audio.muted = (clamped === 0);
+    }
+    if (activePreviewAudio) {
+      activePreviewAudio.volume = clamped;
+      activePreviewAudio.muted = (clamped === 0);
+    }
+
+    if (mainVolumeSlider) {
+      if (updateSlider && Math.abs(parseFloat(mainVolumeSlider.value) - clamped) > 0.005) {
+        mainVolumeSlider.value = clamped;
+      }
+      const pct = (clamped * 100).toFixed(1);
+      mainVolumeSlider.style.setProperty('--volume-pct', `${pct}%`);
+    }
+
+    const volDownBtn = document.getElementById("volDownIcon") || document.querySelector(".volume-slider-box .fa-volume-low, .volume-slider-box .fa-volume-xmark");
+    if (volDownBtn) {
+      if (clamped === 0) {
+        volDownBtn.className = "fa-solid fa-volume-xmark";
+        volDownBtn.style.color = "var(--greca-red)";
+        volDownBtn.setAttribute("title", "Κατάργηση σίγασης");
+      } else {
+        volDownBtn.className = "fa-solid fa-volume-low";
+        volDownBtn.style.color = "";
+        volDownBtn.setAttribute("title", "Σίγαση");
+      }
+    }
+
+    try {
+      localStorage.setItem("greca_app_volume", clamped.toString());
+    } catch (_) {}
   }
+
+  function setupVolumeSliderInteractivity() {
+    if (!mainVolumeSlider) return;
+
+    function calcVolumeFromX(clientX) {
+      const rect = mainVolumeSlider.getBoundingClientRect();
+      if (rect.width <= 0) return 0.85;
+      const clampedX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      return Math.round((clampedX / rect.width) * 100) / 100;
+    }
+
+    let isPointerDown = false;
+
+    // Pointer capture enables buttery-smooth dragging on iOS touchscreens
+    mainVolumeSlider.addEventListener("pointerdown", (e) => {
+      isPointerDown = true;
+      try { mainVolumeSlider.setPointerCapture(e.pointerId); } catch (_) {}
+      const newVol = calcVolumeFromX(e.clientX);
+      setAppVolume(newVol, true);
+    });
+
+    mainVolumeSlider.addEventListener("pointermove", (e) => {
+      if (!isPointerDown) return;
+      e.preventDefault();
+      const newVol = calcVolumeFromX(e.clientX);
+      setAppVolume(newVol, true);
+    });
+
+    const endPointer = (e) => {
+      if (isPointerDown) {
+        isPointerDown = false;
+        try { mainVolumeSlider.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+
+    mainVolumeSlider.addEventListener("pointerup", endPointer);
+    mainVolumeSlider.addEventListener("pointercancel", endPointer);
+
+    // Native range input/change fallback
+    mainVolumeSlider.addEventListener("input", (e) => {
+      setAppVolume(parseFloat(e.target.value), false);
+    });
+    mainVolumeSlider.addEventListener("change", (e) => {
+      setAppVolume(parseFloat(e.target.value), true);
+    });
+
+    // Tap on mute/unmute icon
+    const volDownBtn = document.getElementById("volDownIcon") || document.querySelector(".volume-slider-box .fa-volume-low");
+    const volUpBtn = document.getElementById("volUpIcon") || document.querySelector(".volume-slider-box .fa-volume-high");
+
+    if (volDownBtn) {
+      volDownBtn.addEventListener("click", () => {
+        if (currentAppVolume > 0) {
+          previousAppVolume = currentAppVolume;
+          setAppVolume(0, true);
+        } else {
+          setAppVolume(previousAppVolume > 0 ? previousAppVolume : 0.85, true);
+        }
+      });
+    }
+
+    if (volUpBtn) {
+      volUpBtn.addEventListener("click", () => {
+        setAppVolume(1.0, true);
+      });
+    }
+
+    // Initial sync
+    setAppVolume(currentAppVolume, true);
+  }
+
+  setupVolumeSliderInteractivity();
 
   if (mainHeartBtn) {
     mainHeartBtn.addEventListener("click", function(e) {
@@ -3802,7 +3925,7 @@ function initGrecaApp() {
     if (sleepIntervalHandle) clearInterval(sleepIntervalHandle);
     sleepMins = minutes;
     sleepTargetTimestamp = Date.now() + minutes * 60 * 1000;
-    sleepOriginalVolume = (audio && typeof audio.volume === "number") ? audio.volume : 0.85;
+    sleepOriginalVolume = currentAppVolume;
 
     if (mainSleepTimerBtn) mainSleepTimerBtn.classList.add("active");
     updateSleepCountdownDisplay();
@@ -3816,7 +3939,7 @@ function initGrecaApp() {
         if (audio) {
           audio.pause();
           audio.src = "";
-          audio.volume = sleepOriginalVolume;
+          setAppVolume(sleepOriginalVolume, true);
         }
         isPlaying = false;
         isBuffering = false;
@@ -3826,7 +3949,7 @@ function initGrecaApp() {
       } else {
         if (remainingMs <= 15000 && audio) {
           const factor = Math.max(0, remainingMs / 15000);
-          audio.volume = sleepOriginalVolume * factor;
+          setAppVolume(sleepOriginalVolume * factor, true);
         }
         updateSleepCountdownDisplay();
       }
