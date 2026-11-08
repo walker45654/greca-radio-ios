@@ -2121,6 +2121,12 @@ function initGrecaApp() {
   let audioSwitchTimeout = null;
   let isSwitchingStation = false;
 
+  function getLiveStreamUrl(url) {
+    if (!url) return "";
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}_live=${Date.now()}`;
+  }
+
   function tuneStation(idx, shouldPlay = true) {
     if (idx < 0) idx = DATA.channels.length - 1;
     if (idx >= DATA.channels.length) idx = 0;
@@ -2206,20 +2212,19 @@ function initGrecaApp() {
       try { audio.pause(); } catch (e) {}
 
       // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
-      if (audio.src !== channel.streamUrl) {
-        audio.preload = "auto";
-        audio.src = channel.streamUrl;
-      } else {
-        try { audio.load(); } catch (e) {}
-      }
+      // Always attach fresh live URL with timestamp so AVPlayer reconnects directly to the real-time LIVE broadcast (never resumes stale paused buffer!)
+      audio.preload = "auto";
+      audio.src = getLiveStreamUrl(channel.streamUrl);
+      try { audio.load(); } catch (e) {}
       isSwitchingStation = false;
 
       // Fast buffer watchdog: if stream doesn't play within 4s, seamlessly failover to backup
       bufferTimeout = setTimeout(() => {
         if (thisTuneId === currentTuneId && isBuffering) {
-          if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
+          if (channel.backupStreamUrl) {
             console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
-            audio.src = channel.backupStreamUrl;
+            audio.src = getLiveStreamUrl(channel.backupStreamUrl);
+            try { audio.load(); } catch (e) {}
             audio.play().then(() => {
               if (thisTuneId !== currentTuneId) return;
               isBuffering = false;
@@ -2253,8 +2258,9 @@ function initGrecaApp() {
         }).catch(err => {
           if (thisTuneId !== currentTuneId) return;
           console.warn("Stream playback rejected:", err);
-          if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
-            audio.src = channel.backupStreamUrl;
+          if (channel.backupStreamUrl) {
+            audio.src = getLiveStreamUrl(channel.backupStreamUrl);
+            try { audio.load(); } catch (e) {}
             audio.play().then(() => {
               if (thisTuneId !== currentTuneId) return;
               isBuffering = false;
@@ -3328,6 +3334,8 @@ function initGrecaApp() {
       activePreviewRank = null;
       loadingPreviewRank = null;
       updateChartPreviewUI();
+      // Resume live radio stream fresh from the real-time live edge!
+      tuneStation(currentStationIdx, true);
       return;
     }
 
@@ -3361,17 +3369,23 @@ function initGrecaApp() {
   });
 
   previewAudio.addEventListener("ended", () => {
+    if (loadingPreviewRank !== null) return;
     activePreviewRank = null;
     loadingPreviewRank = null;
     try { previewAudio.pause(); } catch (e) {}
     updateChartPreviewUI();
+    // Resume live radio stream fresh from the real-time live edge!
+    tuneStation(currentStationIdx, true);
   });
 
   previewAudio.addEventListener("error", () => {
+    if (loadingPreviewRank !== null) return;
     activePreviewRank = null;
     loadingPreviewRank = null;
     try { previewAudio.pause(); } catch (e) {}
     updateChartPreviewUI();
+    // Resume live radio stream fresh from the real-time live edge!
+    tuneStation(currentStationIdx, true);
   });
 
   function renderTop30Chart() {
