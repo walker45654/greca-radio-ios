@@ -2999,6 +2999,8 @@ html, body {
   flex-shrink: 0;
   background: #F1F5F9;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chart-track-thumb img {
@@ -3082,7 +3084,8 @@ html, body {
   justify-content: center;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.18s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (hover: hover) and (pointer: fine) {

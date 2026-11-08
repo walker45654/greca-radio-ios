@@ -3281,7 +3281,7 @@ function initGrecaApp() {
     }
   }
 
-  function toggleTrackPreview(track) {
+  function toggleTrackPreview(track, clickedBtn, clickedThumb) {
     if (!track || !track.audio) {
       showNotification("Δεν υπάρχει διαθέσιμο δείγμα ήχου", "fa-solid fa-circle-exclamation");
       return;
@@ -3298,7 +3298,25 @@ function initGrecaApp() {
       return;
     }
 
-    // If main live radio stream was playing, stop it and clear source so it never resumes stale audio!
+    // 1. INSTANT 0ms DIRECT DOM UPDATE: Mutate clicked elements immediately for zero perceived latency!
+    loadingPreviewRank = track.rank;
+    activePreviewRank = null;
+
+    if (clickedBtn) {
+      clickedBtn.classList.remove("is-playing");
+      clickedBtn.classList.add("is-loading");
+      const icon = clickedBtn.querySelector(".preview-play-icon");
+      if (icon) icon.className = "fa-solid fa-spinner fa-spin preview-play-icon";
+    }
+    if (clickedThumb) {
+      clickedThumb.classList.remove("is-playing");
+      clickedThumb.classList.add("is-loading");
+      const icon = clickedThumb.querySelector(".chart-thumb-overlay i");
+      if (icon) icon.className = "fa-solid fa-spinner fa-spin";
+    }
+    updateChartPreviewUI();
+
+    // 2. Stop main live radio stream cleanly
     if (isPlaying || (audio && !audio.paused)) {
       try { audio.pause(); } catch (e) {}
       audio.src = "";
@@ -3307,22 +3325,20 @@ function initGrecaApp() {
       updatePlayStateUI();
     }
 
-    // Immediate UI feedback: Show spinner, do NOT claim playing until audio actually plays!
-    try { previewAudio.pause(); } catch (e) {}
-    loadingPreviewRank = track.rank;
-    activePreviewRank = null;
-    updateChartPreviewUI();
+    // 3. Audio setup in requestAnimationFrame so the browser paints the spinner with 0ms delay!
+    requestAnimationFrame(() => {
+      try { previewAudio.pause(); } catch (e) {}
+      previewAudio.preload = "auto";
+      previewAudio.src = track.audio;
 
-    previewAudio.preload = "auto";
-    previewAudio.src = track.audio;
-
-    previewAudio.play().catch(e => {
-      console.warn("Preview playback error:", e);
-      if (loadingPreviewRank === track.rank) {
-        loadingPreviewRank = null;
-        activePreviewRank = null;
-        updateChartPreviewUI();
-      }
+      previewAudio.play().catch(e => {
+        console.warn("Preview playback error:", e);
+        if (loadingPreviewRank === track.rank) {
+          loadingPreviewRank = null;
+          activePreviewRank = null;
+          updateChartPreviewUI();
+        }
+      });
     });
   }
 
@@ -3411,15 +3427,15 @@ function initGrecaApp() {
       `;
 
       const thumb = card.querySelector(".chart-track-thumb");
+      const prevBtn = card.querySelector(".chart-preview-btn");
       if (thumb && item.audio) {
-        thumb.addEventListener("click", () => toggleTrackPreview(item));
+        thumb.addEventListener("click", () => toggleTrackPreview(item, prevBtn, thumb));
       }
 
-      const prevBtn = card.querySelector(".chart-preview-btn");
       if (prevBtn && item.audio) {
         prevBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          toggleTrackPreview(item);
+          toggleTrackPreview(item, prevBtn, thumb);
         });
       }
 
