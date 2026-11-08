@@ -19,27 +19,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
-    }
-
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
-    }
-
-    func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
-    }
-
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-    }
-
-    func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
-    }
+    func applicationWillResignActive(_ application: UIApplication) {}
+    func applicationDidEnterBackground(_ application: UIApplication) {}
+    func applicationWillEnterForeground(_ application: UIApplication) {}
+    func applicationDidBecomeActive(_ application: UIApplication) {}
+    func applicationWillTerminate(_ application: UIApplication) {}
 
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
@@ -51,46 +35,199 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-@objc(VolumePlugin)
-public class VolumePlugin: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "VolumePlugin"
-    public let jsName = "VolumePlugin"
+@objc(RadioPlayerPlugin)
+public class RadioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "RadioPlayerPlugin"
+    public let jsName = "RadioPlayer"
     public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "playStream", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pauseStream", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playPreview", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pausePreview", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setVolume", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getVolume", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getVolume", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMetadata", returnType: CAPPluginReturnPromise)
     ]
 
-    private var volumeView: MPVolumeView?
-    private var volumeSlider: UISlider?
+    private var streamPlayer: AVPlayer?
+    private var previewPlayer: AVPlayer?
+    private var previewEndObserver: NSObjectProtocol?
+    private var previewErrorObserver: NSObjectProtocol?
+    private var currentVolume: Float = 0.85
+    private var commandsConfigured = false
 
-    public func setupVolumeView(on parentView: UIView) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            if self.volumeView == nil {
-                let vv = MPVolumeView(frame: CGRect(x: -2000, y: -2000, width: 1, height: 1))
-                vv.alpha = 0.001
-                vv.clipsToBounds = true
-                parentView.addSubview(vv)
-                self.volumeView = vv
+    public override func load() {
+        super.load()
+        setupAudioSession()
+        setupRemoteCommands()
+    }
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                    self?.findAndCacheSlider()
-                }
-            }
+    private func setupAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+        } catch {
+            print("RadioPlayerPlugin: AVAudioSession error: \(error)")
         }
     }
 
-    private func findAndCacheSlider() -> UISlider? {
-        if let s = self.volumeSlider { return s }
-        if let vv = self.volumeView {
-            for subview in vv.subviews {
-                if let slider = subview as? UISlider {
-                    self.volumeSlider = slider
-                    return slider
-                }
-            }
+    private func setupRemoteCommands() {
+        guard !commandsConfigured else { return }
+        commandsConfigured = true
+
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        commandCenter.playCommand.isEnabled = true
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
+            self.streamPlayer?.play()
+            self.notifyListeners("remoteAction", data: ["action": "play"])
+            return .success
         }
-        return nil
+
+        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
+            self.streamPlayer?.pause()
+            self.previewPlayer?.pause()
+            self.notifyListeners("remoteAction", data: ["action": "pause"])
+            return .success
+        }
+
+        commandCenter.togglePlayPauseCommand.isEnabled = true
+        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
+            self.notifyListeners("remoteAction", data: ["action": "toggle"])
+            return .success
+        }
+
+        commandCenter.nextTrackCommand.isEnabled = true
+        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
+            self.notifyListeners("remoteAction", data: ["action": "next"])
+            return .success
+        }
+
+        commandCenter.previousTrackCommand.isEnabled = true
+        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+            guard let self = self else { return .commandFailed }
+            self.notifyListeners("remoteAction", data: ["action": "previous"])
+            return .success
+        }
+    }
+
+    @objc func playStream(_ call: CAPPluginCall) {
+        guard let urlStr = call.getString("url"), let url = URL(string: urlStr) else {
+            call.reject("Must provide valid url")
+            return
+        }
+
+        if let vol = call.getFloat("volume") {
+            currentVolume = max(0.0, min(1.0, vol))
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            self.previewPlayer?.pause()
+            self.previewPlayer = nil
+
+            let item = AVPlayerItem(url: url)
+            if self.streamPlayer == nil {
+                self.streamPlayer = AVPlayer(playerItem: item)
+            } else {
+                self.streamPlayer?.replaceCurrentItem(with: item)
+            }
+            self.streamPlayer?.automaticallyWaitsToMinimizeStalling = false
+            self.streamPlayer?.volume = self.currentVolume
+            self.streamPlayer?.play()
+
+            call.resolve(["playing": true, "volume": self.currentVolume])
+        }
+    }
+
+    @objc func pauseStream(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            self?.streamPlayer?.pause()
+            call.resolve(["playing": false])
+        }
+    }
+
+    @objc func playPreview(_ call: CAPPluginCall) {
+        guard let urlStr = call.getString("url"), let url = URL(string: urlStr) else {
+            call.reject("Must provide valid url")
+            return
+        }
+
+        if let vol = call.getFloat("volume") {
+            currentVolume = max(0.0, min(1.0, vol))
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            self.streamPlayer?.pause()
+
+            if let obs = self.previewEndObserver {
+                NotificationCenter.default.removeObserver(obs)
+                self.previewEndObserver = nil
+            }
+            if let obs = self.previewErrorObserver {
+                NotificationCenter.default.removeObserver(obs)
+                self.previewErrorObserver = nil
+            }
+
+            let item = AVPlayerItem(url: url)
+            let player = AVPlayer(playerItem: item)
+            player.automaticallyWaitsToMinimizeStalling = false
+            player.volume = self.currentVolume
+            self.previewPlayer = player
+
+            self.previewEndObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: item,
+                queue: .main
+            ) { [weak self] _ in
+                self?.notifyListeners("previewState", data: ["state": "ended"])
+            }
+
+            self.previewErrorObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemFailedToPlayToEndTime,
+                object: item,
+                queue: .main
+            ) { [weak self] _ in
+                self?.notifyListeners("previewState", data: ["state": "error"])
+            }
+
+            player.play()
+            call.resolve(["playing": true, "volume": self.currentVolume])
+        }
+    }
+
+    @objc func pausePreview(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            self?.previewPlayer?.pause()
+            call.resolve(["playing": false])
+        }
+    }
+
+    @objc func stopPreview(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if let obs = self.previewEndObserver {
+                NotificationCenter.default.removeObserver(obs)
+                self.previewEndObserver = nil
+            }
+            if let obs = self.previewErrorObserver {
+                NotificationCenter.default.removeObserver(obs)
+                self.previewErrorObserver = nil
+            }
+            self.previewPlayer?.pause()
+            self.previewPlayer = nil
+            call.resolve(["stopped": true])
+        }
     }
 
     @objc func setVolume(_ call: CAPPluginCall) {
@@ -98,39 +235,55 @@ public class VolumePlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("Must provide volume")
             return
         }
+
+        let clamped = max(0.0, min(1.0, volume))
+        self.currentVolume = clamped
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
-                call.resolve(["volume": volume])
+                call.resolve(["volume": clamped])
                 return
             }
-            let clamped = max(0.0, min(1.0, volume))
-            if let slider = self.findAndCacheSlider() {
-                slider.setValue(clamped, animated: false)
-                slider.sendActions(for: .valueChanged)
-                call.resolve(["volume": clamped])
-            } else {
-                let keyWindow = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .flatMap { $0.windows }
-                    .first(where: { $0.isKeyWindow })
-                if let kw = keyWindow {
-                    self.setupVolumeView(on: kw)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    if let slider = self?.findAndCacheSlider() {
-                        slider.setValue(clamped, animated: false)
-                        slider.sendActions(for: .valueChanged)
-                    }
-                    call.resolve(["volume": clamped])
-                }
-            }
+            self.streamPlayer?.volume = clamped
+            self.previewPlayer?.volume = clamped
+            call.resolve(["volume": clamped])
         }
     }
 
     @objc func getVolume(_ call: CAPPluginCall) {
+        call.resolve(["volume": self.currentVolume])
+    }
+
+    @objc func setMetadata(_ call: CAPPluginCall) {
+        let title = call.getString("title") ?? "Greca FM 99,4"
+        let artist = call.getString("artist") ?? "Μόνο Επιτυχίες"
+        let station = call.getString("station") ?? "Greca FM 99,4"
+        let artworkUrlStr = call.getString("artworkUrl")
+        let isPlaying = call.getBool("isPlaying") ?? true
+
         DispatchQueue.main.async {
-            let vol = AVAudioSession.sharedInstance().outputVolume
-            call.resolve(["volume": vol])
+            var nowPlayingInfo = [String: Any]()
+            nowPlayingInfo[MPMediaItemPropertyTitle] = title
+            nowPlayingInfo[MPMediaItemPropertyArtist] = artist
+            nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = station
+            nowPlayingInfo[MPNowPlayingInfoPropertyIsLiveStream] = true
+            nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+
+            if let artStr = artworkUrlStr, let artUrl = URL(string: artStr) {
+                URLSession.shared.dataTask(with: artUrl) { (data, _, _) in
+                    if let data = data, let img = UIImage(data: data) {
+                        DispatchQueue.main.async {
+                            var updated = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
+                            let artwork = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
+                            updated[MPMediaItemPropertyArtwork] = artwork
+                            MPNowPlayingInfoCenter.default().nowPlayingInfo = updated
+                        }
+                    }
+                }.resume()
+            }
+            call.resolve()
         }
     }
 }
