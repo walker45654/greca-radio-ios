@@ -2336,17 +2336,18 @@ function initGrecaApp() {
 
   audio.addEventListener("canplay", () => {
     isSwitchingStation = false;
-    isBuffering = false;
-    isPlaying = true;
-    if (bufferTimeout) {
-      clearTimeout(bufferTimeout);
-      bufferTimeout = null;
+    if (isPlaying && !audio.paused) {
+      isBuffering = false;
+      if (bufferTimeout) {
+        clearTimeout(bufferTimeout);
+        bufferTimeout = null;
+      }
+      if (waitingWatchdog) {
+        clearTimeout(waitingWatchdog);
+        waitingWatchdog = null;
+      }
+      updatePlayStateUI();
     }
-    if (waitingWatchdog) {
-      clearTimeout(waitingWatchdog);
-      waitingWatchdog = null;
-    }
-    updatePlayStateUI();
   });
 
   audio.addEventListener("timeupdate", () => {

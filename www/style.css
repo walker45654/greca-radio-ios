@@ -121,7 +121,7 @@ html, body {
   }
 }
 
-/* Main Scroll Area - Background scrolls naturally with content, stopping cleanly where content ends! */
+/* Main Scroll Area - High-Performance GPU scrolling container */
 .app-content-scroll {
   flex: 1;
   width: 100%;
@@ -132,25 +132,36 @@ html, body {
   overscroll-behavior-y: contain;
   overscroll-behavior-x: none;
   touch-action: pan-y;
-  padding: calc(max(env(safe-area-inset-top, 0px), 44px) + 12px) 16px calc(var(--bottom-bar-height) + var(--mini-player-height) + max(env(safe-area-inset-bottom, 0px), 16px) + 20px);
+  padding: 0 0 calc(var(--bottom-bar-height) + var(--mini-player-height) + max(env(safe-area-inset-bottom, 0px), 16px) + 20px) 0;
   scroll-behavior: auto;
   background-color: #FFFFFF;
-  background-image: url('assets/greca_brand_bg.webp?v=10'), url('assets/greca_brand_bg.png?v=10');
-  background-repeat: no-repeat;
-  background-position: top center;
-  background-size: 100% auto;
-  background-attachment: local;
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
 }
 
 .tab-pane {
   display: none;
   position: relative;
   z-index: 1;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: calc(max(env(safe-area-inset-top, 0px), 44px) + 12px) 16px 0 16px;
 }
 .tab-pane.active {
   display: block;
+}
+
+/* Home Station Tab: Branded background scrolls naturally and seamlessly with zero jitter */
+#tab-stations {
+  background-image: url('assets/greca_brand_bg.webp?v=11');
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size: 100% auto;
+  background-color: #FFFFFF;
+  min-height: 100%;
 }
 
 /* ===================================================================
