@@ -302,7 +302,6 @@ function initGrecaApp() {
   const chartTracksList = document.getElementById("chartTracksList");
   const previewAudio = new Audio();
   let activePreviewRank = null;
-  let loadingPreviewRank = null;
 
   // -----------------------------------------------------------------
   // Track History State (Strictly 5 items maximum PER STATION)
@@ -3246,36 +3245,15 @@ function initGrecaApp() {
         const thumb = card.querySelector(".chart-track-thumb");
         const playBtn = card.querySelector(".chart-preview-btn");
         const isThisPlaying = (activePreviewRank === r);
-        const isThisLoading = (loadingPreviewRank === r);
 
         if (thumb) {
           thumb.classList.toggle("is-playing", isThisPlaying);
-          thumb.classList.toggle("is-loading", isThisLoading);
           const overlayIcon = thumb.querySelector(".chart-thumb-overlay i");
-          if (overlayIcon) {
-            if (isThisLoading) {
-              overlayIcon.className = "fa-solid fa-spinner fa-spin";
-            } else if (isThisPlaying) {
-              overlayIcon.className = "fa-solid fa-pause";
-            } else {
-              overlayIcon.className = "fa-solid fa-play";
-            }
-          }
+          if (overlayIcon) overlayIcon.className = isThisPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
         }
 
         if (playBtn) {
           playBtn.classList.toggle("is-playing", isThisPlaying);
-          playBtn.classList.toggle("is-loading", isThisLoading);
-          const playIcon = playBtn.querySelector(".preview-play-icon");
-          if (playIcon) {
-            if (isThisLoading) {
-              playIcon.className = "fa-solid fa-spinner fa-spin preview-play-icon";
-            } else if (isThisPlaying) {
-              playIcon.className = "fa-solid fa-pause preview-play-icon";
-            } else {
-              playIcon.className = "fa-solid fa-play preview-play-icon";
-            }
-          }
         }
       });
     }
@@ -3287,76 +3265,43 @@ function initGrecaApp() {
       return;
     }
 
-    // If currently playing or loading this track -> toggle off, resume live radio
-    if (activePreviewRank === track.rank || loadingPreviewRank === track.rank) {
-      try { previewAudio.pause(); } catch (e) {}
-      previewAudio.src = "";
+    if (activePreviewRank === track.rank) {
+      previewAudio.pause();
       activePreviewRank = null;
-      loadingPreviewRank = null;
       updateChartPreviewUI();
       tuneStation(currentStationIdx, true);
       return;
     }
 
-    // If main live radio stream was playing, stop it and clear source so it never resumes stale audio!
-    if (isPlaying || (audio && !audio.paused)) {
-      try { audio.pause(); } catch (e) {}
-      audio.src = "";
+    // If main live radio stream was playing, pause it
+    if (isPlaying) {
+      audio.pause();
       isPlaying = false;
-      isBuffering = false;
       updatePlayStateUI();
     }
 
-    // Immediate UI feedback: Show spinner, do NOT claim playing until audio actually plays!
-    try { previewAudio.pause(); } catch (e) {}
-    loadingPreviewRank = track.rank;
-    activePreviewRank = null;
-    updateChartPreviewUI();
-
-    previewAudio.preload = "auto";
+    previewAudio.pause();
     previewAudio.src = track.audio;
+    previewAudio.load();
+    activePreviewRank = track.rank;
+    updateChartPreviewUI();
 
     previewAudio.play().catch(e => {
       console.warn("Preview playback error:", e);
-      if (loadingPreviewRank === track.rank) {
-        loadingPreviewRank = null;
-        activePreviewRank = null;
-        updateChartPreviewUI();
-      }
+      activePreviewRank = null;
+      updateChartPreviewUI();
     });
   }
 
-  previewAudio.addEventListener("playing", () => {
-    if (loadingPreviewRank) {
-      activePreviewRank = loadingPreviewRank;
-      loadingPreviewRank = null;
-      updateChartPreviewUI();
-    }
-  });
-
-  previewAudio.addEventListener("pause", () => {
-    if (!loadingPreviewRank && activePreviewRank) {
-      activePreviewRank = null;
-      updateChartPreviewUI();
-    }
-  });
-
   previewAudio.addEventListener("ended", () => {
     activePreviewRank = null;
-    loadingPreviewRank = null;
-    try { previewAudio.pause(); } catch (e) {}
-    previewAudio.src = "";
     updateChartPreviewUI();
-    // Automatically start/resume the live radio station stream FRESH on the live broadcast!
+    // Automatically start/resume the live radio station stream
     tuneStation(currentStationIdx, true);
   });
 
-  previewAudio.addEventListener("error", (e) => {
-    console.warn("Preview audio playback error:", e);
+  previewAudio.addEventListener("error", () => {
     activePreviewRank = null;
-    loadingPreviewRank = null;
-    try { previewAudio.pause(); } catch (err) {}
-    previewAudio.src = "";
     updateChartPreviewUI();
   });
 
@@ -3858,15 +3803,6 @@ function initGrecaApp() {
       mainScroll.scrollTop = 0;
     }
     window.scrollTo(0, 0);
-
-    // Stop preview audio if switching away from chart tab
-    if (targetTab !== "tab-chart" && previewAudio && (!previewAudio.paused || loadingPreviewRank)) {
-      try { previewAudio.pause(); } catch (e) {}
-      previewAudio.src = "";
-      activePreviewRank = null;
-      loadingPreviewRank = null;
-      updateChartPreviewUI();
-    }
 
     if (targetTab === "tab-news") {
       if (loadedNewsItems.length === 0) {
