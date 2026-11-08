@@ -9,6 +9,28 @@ function initGrecaApp() {
   // Audio Elements
   const audio = document.getElementById("audioStream");
   const previewAudio = document.getElementById("previewAudioStream");
+
+  // Native Capacitor iOS Volume Bridge
+  const NativeVolume = (typeof window !== "undefined" && window.Capacitor && typeof window.Capacitor.registerPlugin === "function")
+    ? window.Capacitor.registerPlugin("VolumePlugin")
+    : null;
+
+  let pendingNativeVol = null;
+  let nativeVolRaf = null;
+
+  function syncNativeVolume(v) {
+    if (!NativeVolume || typeof NativeVolume.setVolume !== "function") return;
+    pendingNativeVol = v;
+    if (!nativeVolRaf) {
+      nativeVolRaf = requestAnimationFrame(() => {
+        nativeVolRaf = null;
+        if (pendingNativeVol !== null) {
+          NativeVolume.setVolume({ volume: pendingNativeVol }).catch(() => {});
+          pendingNativeVol = null;
+        }
+      });
+    }
+  }
   let currentStationIdx = 0;
   let isPlaying = false;
   let isBuffering = false;
@@ -3882,6 +3904,9 @@ function initGrecaApp() {
       } catch (_) {}
     }
 
+    // Direct Native iOS Hardware Volume Scaling
+    syncNativeVolume(clamped);
+
     // Direct Web Audio Gain Attenuation (Bypasses iOS WKWebView volume restrictions!)
     ensureAudioContext();
     if (audioCtx) {
@@ -3998,6 +4023,15 @@ function initGrecaApp() {
 
     // Initial sync
     setAppVolume(currentAppVolume, true);
+
+    // Read real hardware volume from iOS on startup
+    if (NativeVolume && typeof NativeVolume.getVolume === "function") {
+      NativeVolume.getVolume().then(res => {
+        if (res && typeof res.volume === "number" && !isNaN(res.volume)) {
+          setAppVolume(res.volume, true);
+        }
+      }).catch(() => {});
+    }
   }
 
   setupVolumeSliderInteractivity();

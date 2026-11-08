@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AVFoundation
+import MediaPlayer
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -47,5 +48,89 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                           sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+}
+
+@objc(VolumePlugin)
+public class VolumePlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "VolumePlugin"
+    public let jsName = "VolumePlugin"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "setVolume", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getVolume", returnType: CAPPluginReturnPromise)
+    ]
+
+    private var volumeView: MPVolumeView?
+    private var volumeSlider: UISlider?
+
+    public func setupVolumeView(on parentView: UIView) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if self.volumeView == nil {
+                let vv = MPVolumeView(frame: CGRect(x: -2000, y: -2000, width: 1, height: 1))
+                vv.alpha = 0.001
+                vv.clipsToBounds = true
+                parentView.addSubview(vv)
+                self.volumeView = vv
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.findAndCacheSlider()
+                }
+            }
+        }
+    }
+
+    private func findAndCacheSlider() -> UISlider? {
+        if let s = self.volumeSlider { return s }
+        if let vv = self.volumeView {
+            for subview in vv.subviews {
+                if let slider = subview as? UISlider {
+                    self.volumeSlider = slider
+                    return slider
+                }
+            }
+        }
+        return nil
+    }
+
+    @objc func setVolume(_ call: CAPPluginCall) {
+        guard let volume = call.getFloat("volume") else {
+            call.reject("Must provide volume")
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                call.resolve(["volume": volume])
+                return
+            }
+            let clamped = max(0.0, min(1.0, volume))
+            if let slider = self.findAndCacheSlider() {
+                slider.setValue(clamped, animated: false)
+                slider.sendActions(for: .valueChanged)
+                call.resolve(["volume": clamped])
+            } else {
+                let keyWindow = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first(where: { $0.isKeyWindow })
+                if let kw = keyWindow {
+                    self.setupVolumeView(on: kw)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    if let slider = self?.findAndCacheSlider() {
+                        slider.setValue(clamped, animated: false)
+                        slider.sendActions(for: .valueChanged)
+                    }
+                    call.resolve(["volume": clamped])
+                }
+            }
+        }
+    }
+
+    @objc func getVolume(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let vol = AVAudioSession.sharedInstance().outputVolume
+            call.resolve(["volume": vol])
+        }
     }
 }
