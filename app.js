@@ -2206,17 +2206,15 @@ function initGrecaApp() {
       // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
       if (audio.src !== channel.streamUrl) {
         audio.src = channel.streamUrl;
-        try { audio.load(); } catch (e) {}
       }
       isSwitchingStation = false;
 
-      // Safety buffer watchdog: if stream doesn't play within 6s, cleanly recover UI
+      // Fast buffer watchdog: if stream doesn't play within 3.5s, seamlessly failover to backup
       bufferTimeout = setTimeout(() => {
         if (thisTuneId === currentTuneId && isBuffering) {
           if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
             console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
             audio.src = channel.backupStreamUrl;
-            try { audio.load(); } catch (e) {}
             audio.play().catch(() => {});
           } else {
             console.warn("Playback buffering timed out, recovering play state");
@@ -2227,7 +2225,7 @@ function initGrecaApp() {
             updatePlayStateUI();
           }
         }
-      }, 6000);
+      }, 3500);
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -2245,7 +2243,6 @@ function initGrecaApp() {
           console.warn("Stream playback rejected:", err);
           if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
             audio.src = channel.backupStreamUrl;
-            try { audio.load(); } catch (e) {}
             audio.play().then(() => {
               if (thisTuneId !== currentTuneId) return;
               isBuffering = false;
@@ -3878,6 +3875,14 @@ function initGrecaApp() {
   // INITIALIZATION (0ms Instant Render + Background Live Polling)
   // -----------------------------------------------------------------
   try {
+    // 0. Pre-arm primary audio stream for instant zero-lag playback on first touch!
+    if (audio && DATA && DATA.channels && DATA.channels[0]) {
+      try {
+        audio.preload = "auto";
+        audio.src = DATA.channels[0].streamUrl;
+      } catch (e) {}
+    }
+
     // 1. Instant Synchronous UI Population (0ms!)
     syncLiveMetadata();
     dismissSplashScreen();
