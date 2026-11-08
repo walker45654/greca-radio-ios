@@ -3984,6 +3984,17 @@ function initGrecaApp() {
   // INITIALIZATION (0ms Instant Render + Background Live Polling)
   // -----------------------------------------------------------------
   try {
+    // Global Native iOS Image Drag, Callout & Selection Prevention
+    window.addEventListener("dragstart", (e) => e.preventDefault());
+    window.addEventListener("contextmenu", (e) => {
+      if (e.target && (e.target.tagName === "IMG" || e.target.closest("img"))) {
+        e.preventDefault();
+      }
+    });
+    document.querySelectorAll("img").forEach(img => {
+      img.setAttribute("draggable", "false");
+    });
+
     // 0. Clean audio setup on launch: 0 stream connections, 0 listeners counted until user presses Play!
     if (audio) {
       audio.preload = "none";
