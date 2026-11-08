@@ -2,8 +2,11 @@ import UIKit
 import Capacitor
 
 class MyBridgeViewController: CAPBridgeViewController {
+    let radioPlayer = RadioPlayer()
+
     override open func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(radioPlayer)
     }
 }
 

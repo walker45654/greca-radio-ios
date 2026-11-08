@@ -10,12 +10,130 @@ function initGrecaApp() {
   const audio = document.getElementById("audioStream");
   const previewAudio = document.getElementById("previewAudioStream");
 
+  const isIosNative = (typeof window !== "undefined" && window.Capacitor && typeof window.Capacitor.getPlatform === "function" && window.Capacitor.getPlatform() === "ios");
+  const NativeRadio = (typeof window !== "undefined" && window.Capacitor && typeof window.Capacitor.registerPlugin === "function")
+    ? window.Capacitor.registerPlugin("RadioPlayer")
+    : ((typeof window !== "undefined" && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RadioPlayer) || null);
+
+  const NativeRadioBridge = {
+    play: (opts) => {
+      if (NativeRadio && typeof NativeRadio.play === "function") {
+        return NativeRadio.play(opts);
+      }
+      if (window.Capacitor && typeof window.Capacitor.nativePromise === "function") {
+        return window.Capacitor.nativePromise("RadioPlayer", "play", opts);
+      }
+      return Promise.reject(new Error("NativeRadio not available"));
+    },
+    pause: () => {
+      if (NativeRadio && typeof NativeRadio.pause === "function") {
+        return NativeRadio.pause();
+      }
+      if (window.Capacitor && typeof window.Capacitor.nativePromise === "function") {
+        return window.Capacitor.nativePromise("RadioPlayer", "pause");
+      }
+      return Promise.reject(new Error("NativeRadio not available"));
+    },
+    setVolume: (opts) => {
+      if (NativeRadio && typeof NativeRadio.setVolume === "function") {
+        return NativeRadio.setVolume(opts);
+      }
+      if (window.Capacitor && typeof window.Capacitor.nativePromise === "function") {
+        return window.Capacitor.nativePromise("RadioPlayer", "setVolume", opts);
+      }
+      return Promise.reject(new Error("NativeRadio not available"));
+    },
+    setMetadata: (opts) => {
+      if (NativeRadio && typeof NativeRadio.setMetadata === "function") {
+        return NativeRadio.setMetadata(opts);
+      }
+      if (window.Capacitor && typeof window.Capacitor.nativePromise === "function") {
+        return window.Capacitor.nativePromise("RadioPlayer", "setMetadata", opts);
+      }
+      return Promise.reject(new Error("NativeRadio not available"));
+    },
+    addListener: (eventName, callback) => {
+      if (NativeRadio && typeof NativeRadio.addListener === "function") {
+        return NativeRadio.addListener(eventName, callback);
+      }
+      if (window.Capacitor && typeof window.Capacitor.addListener === "function") {
+        return window.Capacitor.addListener("RadioPlayer", eventName, callback);
+      }
+      return null;
+    }
+  };
 
   let currentStationIdx = 0;
   let isPlaying = false;
   let isBuffering = false;
   let activeFilter = "all";
   const liveWebRadioNowPlaying = {};
+
+  if (isIosNative) {
+    try {
+      NativeRadioBridge.addListener("status", (data) => {
+        if (!data) return;
+        const state = data.state;
+        if (state === "playing") {
+          isBuffering = false;
+          isPlaying = true;
+          updatePlayStateUI();
+          if (loadingPreviewRank !== null) {
+            activePreviewRank = loadingPreviewRank;
+            loadingPreviewRank = null;
+            updateChartPreviewUI();
+          }
+        } else if (state === "waiting") {
+          isBuffering = true;
+          updatePlayStateUI();
+        } else if (state === "paused") {
+          isPlaying = false;
+          isBuffering = false;
+          updatePlayStateUI();
+        } else if (state === "ended") {
+          if (activePreviewRank !== null || loadingPreviewRank !== null) {
+            activePreviewRank = null;
+            loadingPreviewRank = null;
+            updateChartPreviewUI();
+            tuneStation(currentStationIdx, true);
+          }
+        } else if (state === "error") {
+          if (activePreviewRank !== null || loadingPreviewRank !== null) {
+            activePreviewRank = null;
+            loadingPreviewRank = null;
+            updateChartPreviewUI();
+            tuneStation(currentStationIdx, true);
+          } else if (isPlaying || isBuffering) {
+            const ch = (DATA.channels && DATA.channels[currentStationIdx]);
+            if (ch && ch.backupStreamUrl) {
+              NativeRadioBridge.play({ url: getLiveStreamUrl(ch.backupStreamUrl), volume: currentAppVolume }).catch(() => {
+                isBuffering = false;
+                isPlaying = false;
+                updatePlayStateUI();
+              });
+            } else {
+              isBuffering = false;
+              isPlaying = false;
+              updatePlayStateUI();
+            }
+          }
+        }
+      });
+
+      NativeRadioBridge.addListener("remoteAction", (data) => {
+        if (!data) return;
+        if (data.action === "play") {
+          if (!isPlaying) tuneStation(currentStationIdx, true);
+        } else if (data.action === "pause") {
+          tuneStation(currentStationIdx, false);
+        } else if (data.action === "next") {
+          tuneStation(currentStationIdx + 1, true);
+        } else if (data.action === "previous") {
+          tuneStation(currentStationIdx - 1, true);
+        }
+      });
+    } catch (_) {}
+  }
 
   // -----------------------------------------------------------------
   // User Personal Favorites (Local to this user/device only!)
@@ -792,6 +910,17 @@ function initGrecaApp() {
           }
         }
       } catch (nativeErr) {}
+
+      // 1b. Native iOS RadioPlayer Lockscreen Info
+      if (isIosNative) {
+        NativeRadioBridge.setMetadata({
+          title: displayTitle,
+          artist: displayArtist,
+          station: channel.name,
+          artworkUrl: fullArt,
+          isPlaying: isPlaying
+        }).catch(() => {});
+      }
 
       // 2. Web & iOS Safari Standard MediaSession (Lockscreen widget, Control Center, Dynamic Island)
       if ('mediaSession' in navigator) {
@@ -2239,79 +2368,115 @@ function initGrecaApp() {
 
       const streamUrl = getLiveStreamUrl(channel.streamUrl);
 
-      // Fast synchronous stream attachment for iOS & Android
-      audio.preload = "auto";
-      audio.crossOrigin = "anonymous";
-      audio.volume = currentAppVolume;
-      audio.muted = (currentAppVolume === 0);
-      audio.src = streamUrl;
-      try { audio.load(); } catch (e) {}
-      isSwitchingStation = false;
-
-      // Fast buffer watchdog: if stream doesn't play within 4s, seamlessly failover to backup
-      bufferTimeout = setTimeout(() => {
-        if (thisTuneId === currentTuneId && isBuffering) {
-          if (channel.backupStreamUrl) {
-            console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
-            audio.src = getLiveStreamUrl(channel.backupStreamUrl);
-            try { audio.load(); } catch (e) {}
-            audio.play().then(() => {
-              if (thisTuneId !== currentTuneId) return;
-              isBuffering = false;
-              isPlaying = true;
-              updatePlayStateUI();
-            }).catch(() => {
-              if (thisTuneId !== currentTuneId) return;
-              isBuffering = false;
-              isPlaying = false;
-              updatePlayStateUI();
-            });
-          } else {
-            console.warn("Playback buffering timed out, recovering play state");
-            isBuffering = false;
-            if (audio.paused) {
-              isPlaying = false;
-            }
-            updatePlayStateUI();
-          }
-        }
-      }, 4000);
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
+      if (isIosNative) {
+        NativeRadioBridge.play({ url: streamUrl, volume: currentAppVolume }).then(() => {
           if (thisTuneId !== currentTuneId) return;
+          isSwitchingStation = false;
           isBuffering = false;
           isPlaying = true;
-          if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
           updatePlayStateUI();
         }).catch(err => {
           if (thisTuneId !== currentTuneId) return;
-          console.warn("Stream playback rejected:", err);
+          console.warn("Native stream playback rejected:", err);
           if (channel.backupStreamUrl) {
-            audio.src = getLiveStreamUrl(channel.backupStreamUrl);
-            try { audio.load(); } catch (e) {}
-            audio.play().then(() => {
+            NativeRadioBridge.play({ url: getLiveStreamUrl(channel.backupStreamUrl), volume: currentAppVolume }).then(() => {
               if (thisTuneId !== currentTuneId) return;
+              isSwitchingStation = false;
               isBuffering = false;
               isPlaying = true;
-              if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
               updatePlayStateUI();
             }).catch(() => {
               if (thisTuneId !== currentTuneId) return;
+              isSwitchingStation = false;
               isBuffering = false;
               isPlaying = false;
               updatePlayStateUI();
             });
           } else {
+            isSwitchingStation = false;
             isBuffering = false;
             isPlaying = false;
             updatePlayStateUI();
           }
         });
+      } else {
+        // Fast synchronous stream attachment for Android & Web
+        audio.preload = "auto";
+        audio.crossOrigin = "anonymous";
+        audio.volume = currentAppVolume;
+        audio.muted = (currentAppVolume === 0);
+        audio.src = streamUrl;
+        try { audio.load(); } catch (e) {}
+        isSwitchingStation = false;
+
+        // Fast buffer watchdog: if stream doesn't play within 4s, seamlessly failover to backup
+        bufferTimeout = setTimeout(() => {
+          if (thisTuneId === currentTuneId && isBuffering) {
+            if (channel.backupStreamUrl) {
+              console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
+              audio.src = getLiveStreamUrl(channel.backupStreamUrl);
+              try { audio.load(); } catch (e) {}
+              audio.play().then(() => {
+                if (thisTuneId !== currentTuneId) return;
+                isBuffering = false;
+                isPlaying = true;
+                updatePlayStateUI();
+              }).catch(() => {
+                if (thisTuneId !== currentTuneId) return;
+                isBuffering = false;
+                isPlaying = false;
+                updatePlayStateUI();
+              });
+            } else {
+              console.warn("Playback buffering timed out, recovering play state");
+              isBuffering = false;
+              if (audio.paused) {
+                isPlaying = false;
+              }
+              updatePlayStateUI();
+            }
+          }
+        }, 4000);
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            if (thisTuneId !== currentTuneId) return;
+            isBuffering = false;
+            isPlaying = true;
+            if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
+            updatePlayStateUI();
+          }).catch(err => {
+            if (thisTuneId !== currentTuneId) return;
+            console.warn("Stream playback rejected:", err);
+            if (channel.backupStreamUrl) {
+              audio.src = getLiveStreamUrl(channel.backupStreamUrl);
+              try { audio.load(); } catch (e) {}
+              audio.play().then(() => {
+                if (thisTuneId !== currentTuneId) return;
+                isBuffering = false;
+                isPlaying = true;
+                if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
+                updatePlayStateUI();
+              }).catch(() => {
+                if (thisTuneId !== currentTuneId) return;
+                isBuffering = false;
+                isPlaying = false;
+                updatePlayStateUI();
+              });
+            } else {
+              isBuffering = false;
+              isPlaying = false;
+              updatePlayStateUI();
+            }
+          });
+        }
       }
     } else {
       isSwitchingStation = false;
+      if (isIosNative) {
+        NativeRadioBridge.pause().catch(() => {});
+      }
       try { audio.pause(); } catch (e) {}
       isBuffering = false;
       isPlaying = false;
@@ -2344,7 +2509,7 @@ function initGrecaApp() {
   let waitingWatchdog = null;
 
   audio.addEventListener("waiting", () => {
-    if (isSwitchingStation || !isPlaying) return;
+    if (isSwitchingStation || !isPlaying || isIosNative) return;
     isBuffering = true;
     updatePlayStateUI();
 
@@ -2365,6 +2530,7 @@ function initGrecaApp() {
   });
 
   audio.addEventListener("playing", () => {
+    if (isIosNative) return;
     isSwitchingStation = false;
     isBuffering = false;
     isPlaying = true;
@@ -2380,6 +2546,7 @@ function initGrecaApp() {
   });
 
   audio.addEventListener("canplay", () => {
+    if (isIosNative) return;
     isSwitchingStation = false;
     if (isPlaying && !audio.paused) {
       isBuffering = false;
@@ -2396,6 +2563,7 @@ function initGrecaApp() {
   });
 
   audio.addEventListener("timeupdate", () => {
+    if (isIosNative) return;
     if (isBuffering && isPlaying) {
       isBuffering = false;
       if (waitingWatchdog) {
@@ -2407,7 +2575,7 @@ function initGrecaApp() {
   });
 
   audio.addEventListener("pause", () => {
-    if (isSwitchingStation) return;
+    if (isSwitchingStation || isIosNative) return;
     isBuffering = false;
     isPlaying = false;
     if (waitingWatchdog) {
@@ -2418,7 +2586,7 @@ function initGrecaApp() {
   });
 
   audio.addEventListener("ended", () => {
-    if (isSwitchingStation) return;
+    if (isSwitchingStation || isIosNative) return;
     isBuffering = false;
     isPlaying = false;
     if (waitingWatchdog) {
@@ -2429,7 +2597,7 @@ function initGrecaApp() {
   });
 
   audio.addEventListener("error", (e) => {
-    if (isSwitchingStation) return;
+    if (isSwitchingStation || isIosNative) return;
     console.warn("Audio hardware error event:", e);
     isBuffering = false;
     isPlaying = false;
@@ -3299,6 +3467,9 @@ function initGrecaApp() {
     isBuffering = false;
     isPlaying = false;
     isSwitchingStation = false;
+    if (isIosNative) {
+      NativeRadioBridge.pause().catch(() => {});
+    }
     try { audio.pause(); } catch (e) {}
     updatePlayStateUI();
   }
@@ -3346,6 +3517,9 @@ function initGrecaApp() {
     // If user tapped the currently playing or loading track -> toggle it off (pause)
     if (activePreviewRank === track.rank || loadingPreviewRank === track.rank) {
       previewSessionId++;
+      if (isIosNative) {
+        NativeRadioBridge.pause().catch(() => {});
+      }
       if (activePreviewAudio) {
         try { activePreviewAudio.pause(); } catch (e) {}
         activePreviewAudio.src = "";
@@ -3367,6 +3541,9 @@ function initGrecaApp() {
     const currentSession = ++previewSessionId;
 
     // 2. Stop and discard previous preview audio completely
+    if (isIosNative) {
+      NativeRadioBridge.pause().catch(() => {});
+    }
     if (activePreviewAudio) {
       try { activePreviewAudio.pause(); } catch (e) {}
       activePreviewAudio.src = "";
@@ -3382,7 +3559,18 @@ function initGrecaApp() {
     loadingPreviewRank = track.rank;
     updateChartPreviewUI();
 
-    // 4. Use dedicated preview audio element
+    if (isIosNative) {
+      NativeRadioBridge.play({ url: track.audio, volume: currentAppVolume }).catch(err => {
+        if (previewSessionId !== currentSession) return;
+        console.warn("Native preview play rejected:", err);
+        activePreviewRank = null;
+        loadingPreviewRank = null;
+        updateChartPreviewUI();
+      });
+      return;
+    }
+
+    // 4. Use dedicated preview audio element (Android & Web)
     const pAudio = previewAudio || new Audio();
     activePreviewAudio = pAudio;
     pAudio.crossOrigin = "anonymous";
@@ -3799,6 +3987,10 @@ function initGrecaApp() {
     const clamped = Math.max(0, Math.min(1, typeof vol === "number" && !isNaN(vol) ? vol : 0.85));
     currentAppVolume = clamped;
 
+    if (isIosNative) {
+      NativeRadioBridge.setVolume({ volume: clamped }).catch(() => {});
+    }
+
     if (audio) {
       audio.volume = clamped;
       audio.muted = (clamped === 0);
@@ -3959,6 +4151,9 @@ function initGrecaApp() {
       if (remainingMs <= 0) {
         clearInterval(sleepIntervalHandle);
         sleepIntervalHandle = null;
+        if (isIosNative) {
+          NativeRadioBridge.pause().catch(() => {});
+        }
         if (audio) {
           audio.pause();
           audio.src = "";
@@ -4241,7 +4436,7 @@ function initGrecaApp() {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         // A. Immediate hardware audio state alignment
-        if (audio) {
+        if (!isIosNative && audio) {
           if (audio.paused && isPlaying) {
             isPlaying = false;
             isBuffering = false;
