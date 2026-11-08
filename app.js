@@ -6,8 +6,9 @@
 function initGrecaApp() {
   const DATA = (typeof window !== "undefined" && window.APP_DATA) ? window.APP_DATA : (typeof APP_DATA !== "undefined" ? APP_DATA : { channels: [], initialHistory: [] });
   
-  // Audio Element
+  // Audio Elements
   const audio = document.getElementById("audioStream");
+  const previewAudio = document.getElementById("previewAudioStream");
   let currentStationIdx = 0;
   let isPlaying = false;
   let isBuffering = false;
@@ -200,6 +201,61 @@ function initGrecaApp() {
       }
     }
   } catch (_) {}
+
+  // Web Audio API Gain Control (Bypasses iOS WKWebView HTMLMediaElement volume restrictions!)
+  let audioCtx = null;
+  let streamGainNode = null;
+  let previewGainNode = null;
+  let streamSourceNode = null;
+  let previewSourceNode = null;
+
+  function ensureAudioContext() {
+    try {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtxClass) return null;
+      if (!audioCtx) {
+        audioCtx = new AudioCtxClass();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+
+      if (typeof navigator !== "undefined" && navigator.audioSession) {
+        try { navigator.audioSession.type = "playback"; } catch (_) {}
+      }
+
+      // Master Gain for Live Radio Stream
+      if (audio && !streamSourceNode) {
+        try {
+          audio.crossOrigin = "anonymous";
+          streamGainNode = audioCtx.createGain();
+          streamGainNode.gain.setValueAtTime(currentAppVolume, audioCtx.currentTime);
+          streamSourceNode = audioCtx.createMediaElementSource(audio);
+          streamSourceNode.connect(streamGainNode);
+          streamGainNode.connect(audioCtx.destination);
+        } catch (e) {
+          console.warn("Stream GainNode setup:", e);
+        }
+      }
+
+      // Master Gain for Top 30 Preview Audio
+      if (previewAudio && !previewSourceNode) {
+        try {
+          previewAudio.crossOrigin = "anonymous";
+          previewGainNode = audioCtx.createGain();
+          previewGainNode.gain.setValueAtTime(currentAppVolume, audioCtx.currentTime);
+          previewSourceNode = audioCtx.createMediaElementSource(previewAudio);
+          previewSourceNode.connect(previewGainNode);
+          previewGainNode.connect(audioCtx.destination);
+        } catch (e) {
+          console.warn("Preview GainNode setup:", e);
+        }
+      }
+    } catch (e) {
+      console.warn("Web Audio context initialization:", e);
+    }
+    return audioCtx;
+  }
 
   // Safe DOM Elements
   const mainScroll = document.getElementById("mainScroll");
@@ -2212,6 +2268,10 @@ function initGrecaApp() {
         activePreviewAudio.src = "";
         activePreviewAudio = null;
       }
+      if (previewAudio) {
+        try { previewAudio.pause(); } catch (e) {}
+        previewAudio.src = "";
+      }
       activePreviewRank = null;
       loadingPreviewRank = null;
       previewSessionId++;
@@ -2232,8 +2292,16 @@ function initGrecaApp() {
       // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
       // Always attach fresh live URL with timestamp so AVPlayer reconnects directly to the real-time LIVE broadcast (never resumes stale paused buffer!)
       audio.preload = "auto";
+      audio.crossOrigin = "anonymous";
       audio.volume = currentAppVolume;
       audio.muted = (currentAppVolume === 0);
+      ensureAudioContext();
+      if (streamGainNode && audioCtx) {
+        try {
+          streamGainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+          streamGainNode.gain.setValueAtTime(currentAppVolume, audioCtx.currentTime);
+        } catch (_) {}
+      }
       audio.src = getLiveStreamUrl(channel.streamUrl);
       try { audio.load(); } catch (e) {}
       isSwitchingStation = false;
@@ -3343,6 +3411,10 @@ function initGrecaApp() {
         activePreviewAudio.src = "";
         activePreviewAudio = null;
       }
+      if (previewAudio) {
+        try { previewAudio.pause(); } catch (e) {}
+        previewAudio.src = "";
+      }
       activePreviewRank = null;
       loadingPreviewRank = null;
       updateChartPreviewUI();
@@ -3360,58 +3432,71 @@ function initGrecaApp() {
       activePreviewAudio.src = "";
       activePreviewAudio = null;
     }
+    if (previewAudio) {
+      try { previewAudio.pause(); } catch (e) {}
+      previewAudio.src = "";
+    }
 
     // 3. Immediately show the spinning circle (0ms instant visual feedback) & clear old bars
     activePreviewRank = null;
     loadingPreviewRank = track.rank;
     updateChartPreviewUI();
 
-    // 4. Create a clean, isolated new Audio element for this preview track
-    const a = new Audio();
-    activePreviewAudio = a;
-    a.preload = "auto";
-    a.volume = currentAppVolume;
-    a.muted = (currentAppVolume === 0);
-    a.src = track.audio;
+    // 4. Use dedicated preview audio element connected to Web Audio Gain
+    const pAudio = previewAudio || new Audio();
+    activePreviewAudio = pAudio;
+    pAudio.crossOrigin = "anonymous";
+    pAudio.preload = "auto";
+    pAudio.volume = currentAppVolume;
+    pAudio.muted = (currentAppVolume === 0);
+    pAudio.src = track.audio;
+
+    ensureAudioContext();
+    if (previewGainNode && audioCtx) {
+      try {
+        previewGainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+        previewGainNode.gain.setValueAtTime(currentAppVolume, audioCtx.currentTime);
+      } catch (_) {}
+    }
 
     // 5. Only transition to "playing" when audio ACTUALLY begins playback with real buffered frames
     const onStartPlaying = () => {
       if (previewSessionId !== currentSession) return;
-      if (a.readyState < 2) return; // Prevent any premature ghost trigger!
+      if (pAudio.readyState < 2) return; // Prevent any premature ghost trigger!
       activePreviewRank = track.rank;
       loadingPreviewRank = null;
       updateChartPreviewUI();
     };
 
-    a.addEventListener("playing", onStartPlaying);
-    a.addEventListener("timeupdate", () => {
-      if (previewSessionId === currentSession && loadingPreviewRank === track.rank && a.currentTime > 0) {
+    pAudio.onplaying = onStartPlaying;
+    pAudio.ontimeupdate = () => {
+      if (previewSessionId === currentSession && loadingPreviewRank === track.rank && pAudio.currentTime > 0) {
         onStartPlaying();
       }
-    });
+    };
 
-    a.addEventListener("ended", () => {
+    pAudio.onended = () => {
       if (previewSessionId !== currentSession) return;
       activePreviewRank = null;
       loadingPreviewRank = null;
-      if (activePreviewAudio === a) activePreviewAudio = null;
+      if (activePreviewAudio === pAudio) activePreviewAudio = null;
       updateChartPreviewUI();
       // Resume live radio stream fresh from the real-time live edge!
       tuneStation(currentStationIdx, true);
-    });
+    };
 
-    a.addEventListener("error", (e) => {
+    pAudio.onerror = (e) => {
       if (previewSessionId !== currentSession) return;
       console.warn("Preview playback error:", e);
       activePreviewRank = null;
       loadingPreviewRank = null;
-      if (activePreviewAudio === a) activePreviewAudio = null;
+      if (activePreviewAudio === pAudio) activePreviewAudio = null;
       updateChartPreviewUI();
       tuneStation(currentStationIdx, true);
-    });
+    };
 
-    try { a.load(); } catch (e) {}
-    a.play().catch(err => {
+    try { pAudio.load(); } catch (e) {}
+    pAudio.play().catch(err => {
       if (previewSessionId !== currentSession) return;
       console.warn("Preview play rejected:", err);
       activePreviewRank = null;
@@ -3786,9 +3871,37 @@ function initGrecaApp() {
       audio.volume = clamped;
       audio.muted = (clamped === 0);
     }
-    if (activePreviewAudio) {
-      activePreviewAudio.volume = clamped;
-      activePreviewAudio.muted = (clamped === 0);
+    if (previewAudio) {
+      previewAudio.volume = clamped;
+      previewAudio.muted = (clamped === 0);
+    }
+    if (activePreviewAudio && activePreviewAudio !== previewAudio) {
+      try {
+        activePreviewAudio.volume = clamped;
+        activePreviewAudio.muted = (clamped === 0);
+      } catch (_) {}
+    }
+
+    // Direct Web Audio Gain Attenuation (Bypasses iOS WKWebView volume restrictions!)
+    ensureAudioContext();
+    if (audioCtx) {
+      const now = audioCtx.currentTime;
+      if (streamGainNode) {
+        try {
+          streamGainNode.gain.cancelScheduledValues(now);
+          streamGainNode.gain.setValueAtTime(clamped, now);
+        } catch (_) {
+          streamGainNode.gain.value = clamped;
+        }
+      }
+      if (previewGainNode) {
+        try {
+          previewGainNode.gain.cancelScheduledValues(now);
+          previewGainNode.gain.setValueAtTime(clamped, now);
+        } catch (_) {
+          previewGainNode.gain.value = clamped;
+        }
+      }
     }
 
     if (mainVolumeSlider) {
@@ -3888,6 +4001,22 @@ function initGrecaApp() {
   }
 
   setupVolumeSliderInteractivity();
+
+  // Global user gesture activation for Web Audio API on iOS WKWebView
+  const userGestureResume = () => {
+    ensureAudioContext();
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener("pointerdown", userGestureResume, { passive: true });
+  window.addEventListener("touchstart", userGestureResume, { passive: true });
+  window.addEventListener("click", userGestureResume, { passive: true });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      userGestureResume();
+    }
+  });
 
   if (mainHeartBtn) {
     mainHeartBtn.addEventListener("click", function(e) {

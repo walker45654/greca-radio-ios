@@ -35,7 +35,7 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="style.css?v=116">
+  <link rel="stylesheet" href="style.css?v=117">
 
   <!-- Clean White Splash Screen (Simple Breathing Logo) -->
   <style id="splashStyles">
@@ -657,14 +657,15 @@
     </div>
 
 
-    <!-- Hidden HTML5 Audio Element -->
-    <audio id="audioStream" preload="auto" playsinline></audio>
+    <!-- Hidden HTML5 Audio Elements with Web Audio CORS support -->
+    <audio id="audioStream" preload="auto" playsinline crossorigin="anonymous"></audio>
+    <audio id="previewAudioStream" preload="auto" playsinline crossorigin="anonymous"></audio>
 
   </div>
 
   <script src="capacitor.js"></script>
   <script src="stations-data.js?v=97"></script>
-  <script src="app.js?v=116"></script>
+  <script src="app.js?v=117"></script>
 </body>
 
 </html>
