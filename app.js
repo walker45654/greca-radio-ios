@@ -2201,23 +2201,35 @@ function initGrecaApp() {
         bufferTimeout = null;
       }
 
-      // Pause current audio cleanly
+      // Pause current audio cleanly without stripping src
       try { audio.pause(); } catch (e) {}
 
       // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
-      // Reset source first to guarantee reconnect to real-time LIVE broadcast edge (never resume stale time-shifted buffer!)
-      audio.src = "";
-      audio.preload = "auto";
-      audio.src = channel.streamUrl;
+      if (audio.src !== channel.streamUrl) {
+        audio.preload = "auto";
+        audio.src = channel.streamUrl;
+      } else {
+        try { audio.load(); } catch (e) {}
+      }
       isSwitchingStation = false;
 
-      // Fast buffer watchdog: if stream doesn't play within 3.5s, seamlessly failover to backup
+      // Fast buffer watchdog: if stream doesn't play within 4s, seamlessly failover to backup
       bufferTimeout = setTimeout(() => {
         if (thisTuneId === currentTuneId && isBuffering) {
           if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
             console.warn("Primary stream delayed, attempting backup:", channel.backupStreamUrl);
             audio.src = channel.backupStreamUrl;
-            audio.play().catch(() => {});
+            audio.play().then(() => {
+              if (thisTuneId !== currentTuneId) return;
+              isBuffering = false;
+              isPlaying = true;
+              updatePlayStateUI();
+            }).catch(() => {
+              if (thisTuneId !== currentTuneId) return;
+              isBuffering = false;
+              isPlaying = false;
+              updatePlayStateUI();
+            });
           } else {
             console.warn("Playback buffering timed out, recovering play state");
             isBuffering = false;
@@ -2227,7 +2239,7 @@ function initGrecaApp() {
             updatePlayStateUI();
           }
         }
-      }, 3500);
+      }, 4000);
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
@@ -2239,9 +2251,6 @@ function initGrecaApp() {
           updatePlayStateUI();
         }).catch(err => {
           if (thisTuneId !== currentTuneId) return;
-          if (err && err.name === "AbortError") {
-            return; // Expected when rapidly interrupted by another station switch
-          }
           console.warn("Stream playback rejected:", err);
           if (channel.backupStreamUrl && audio.src !== channel.backupStreamUrl) {
             audio.src = channel.backupStreamUrl;
@@ -3289,7 +3298,6 @@ function initGrecaApp() {
 
     if (activePreviewRank === track.rank || loadingPreviewRank === track.rank) {
       try { previewAudio.pause(); } catch (e) {}
-      previewAudio.src = "";
       activePreviewRank = null;
       loadingPreviewRank = null;
       updateChartPreviewUI();
@@ -3337,7 +3345,6 @@ function initGrecaApp() {
     activePreviewRank = null;
     loadingPreviewRank = null;
     try { previewAudio.pause(); } catch (e) {}
-    previewAudio.src = "";
     updateChartPreviewUI();
     // Automatically start/resume the live radio station stream
     tuneStation(currentStationIdx, true);
@@ -3347,7 +3354,6 @@ function initGrecaApp() {
     activePreviewRank = null;
     loadingPreviewRank = null;
     try { previewAudio.pause(); } catch (e) {}
-    previewAudio.src = "";
     updateChartPreviewUI();
   });
 
@@ -3980,7 +3986,7 @@ function initGrecaApp() {
     // 0. Clean audio setup on launch: 0 stream connections, 0 listeners counted until user presses Play!
     if (audio) {
       audio.preload = "none";
-      audio.src = "";
+      try { audio.removeAttribute("src"); } catch(e) {}
     }
 
     // 1. Instant Synchronous UI Population (0ms!)
