@@ -3846,6 +3846,49 @@ function initGrecaApp() {
   });
 
   // -----------------------------------------------------------------
+  // iOS Overscroll & Rubber-Band Boundary Lock
+  // Completely eliminates elastic stretch past top and bottom!
+  // -----------------------------------------------------------------
+  if (mainScroll) {
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let lastTouchY = 0;
+
+    mainScroll.addEventListener("touchstart", (e) => {
+      if (e.touches && e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        lastTouchY = touchStartY;
+      }
+    }, { passive: true });
+
+    mainScroll.addEventListener("touchmove", (e) => {
+      if (!e.touches || e.touches.length !== 1) return;
+      const currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      const totalDeltaX = currentX - touchStartX;
+      const totalDeltaY = currentY - touchStartY;
+      const stepDeltaY = currentY - lastTouchY;
+      lastTouchY = currentY;
+
+      // Only evaluate vertical gestures (allow horizontal swipes in carousels)
+      if (Math.abs(totalDeltaY) >= Math.abs(totalDeltaX)) {
+        const isAtTop = mainScroll.scrollTop <= 0;
+        const isAtBottom = (mainScroll.scrollTop + mainScroll.clientHeight) >= (mainScroll.scrollHeight - 1);
+
+        // At top dragging down -> block rubber-band stretch
+        if (isAtTop && stepDeltaY > 0) {
+          if (e.cancelable) e.preventDefault();
+        }
+        // At bottom dragging up -> block rubber-band stretch
+        else if (isAtBottom && stepDeltaY < 0) {
+          if (e.cancelable) e.preventDefault();
+        }
+      }
+    }, { passive: false });
+  }
+
+  // -----------------------------------------------------------------
   // Smooth Dismissal of Animated Splash Screen (Zero Flash, Full Pulse)
   // -----------------------------------------------------------------
   function dismissSplashScreen() {
