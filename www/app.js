@@ -3280,16 +3280,20 @@ function initGrecaApp() {
       updatePlayStateUI();
     }
 
-    previewAudio.pause();
-    previewAudio.src = track.audio;
-    previewAudio.load();
+    // Instantly switch active rank & update UI so previous track stops immediately without freezing!
     activePreviewRank = track.rank;
     updateChartPreviewUI();
 
+    previewAudio.pause();
+    previewAudio.preload = "auto";
+    previewAudio.src = track.audio;
+
     previewAudio.play().catch(e => {
       console.warn("Preview playback error:", e);
-      activePreviewRank = null;
-      updateChartPreviewUI();
+      if (activePreviewRank === track.rank) {
+        activePreviewRank = null;
+        updateChartPreviewUI();
+      }
     });
   }
 

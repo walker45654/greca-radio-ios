@@ -3022,12 +3022,14 @@ html, body {
   border-radius: 12px;
 }
 
-.chart-track-thumb:hover .chart-thumb-overlay,
-.chart-track-thumb.is-playing .chart-thumb-overlay {
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .chart-track-thumb:hover .chart-thumb-overlay {
+    opacity: 1;
+  }
 }
 
 .chart-track-thumb.is-playing .chart-thumb-overlay {
+  opacity: 1;
   background: rgba(0, 0, 0, 0.44); /* Subtle dark shading so the cover logo is visible and the 2 white pause bars stand out */
 }
 
@@ -3082,10 +3084,16 @@ html, body {
   transition: all 0.18s ease;
 }
 
-.chart-preview-btn:hover {
-  background: var(--greca-red);
-  color: #FFFFFF;
-  border-color: var(--greca-red);
+@media (hover: hover) and (pointer: fine) {
+  .chart-preview-btn:hover {
+    background: var(--greca-red);
+    color: #FFFFFF;
+    border-color: var(--greca-red);
+  }
+}
+
+.chart-preview-btn:active {
+  transform: scale(0.92);
 }
 
 .chart-preview-btn.is-playing {
