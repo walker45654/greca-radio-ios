@@ -3065,6 +3065,7 @@ html, body {
   border-top-color: #FFFFFF;
   border-right-color: #FFFFFF;
   border-radius: 50%;
+  -webkit-animation: grecaSpinnerSpin 0.65s linear infinite;
   animation: grecaSpinnerSpin 0.65s linear infinite;
   box-sizing: border-box;
 }
@@ -3152,6 +3153,7 @@ html, body {
   border-top-color: var(--greca-red);
   border-right-color: var(--greca-red);
   border-radius: 50%;
+  -webkit-animation: grecaSpinnerSpin 0.65s linear infinite;
   animation: grecaSpinnerSpin 0.65s linear infinite;
   box-sizing: border-box;
 }
@@ -3248,9 +3250,13 @@ html, body {
   100% { height: 12px; }
 }
 
+@-webkit-keyframes grecaSpinnerSpin {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
 @keyframes grecaSpinnerSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
 }
 
 

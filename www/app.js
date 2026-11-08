@@ -300,9 +300,10 @@ function initGrecaApp() {
 
   // Top 30 Chart Elements
   const chartTracksList = document.getElementById("chartTracksList");
-  const previewAudio = new Audio();
+  let activePreviewAudio = null;
   let activePreviewRank = null;
   let loadingPreviewRank = null;
+  let previewSessionId = 0;
 
   // -----------------------------------------------------------------
   // Track History State (Strictly 5 items maximum PER STATION)
@@ -2192,11 +2193,14 @@ function initGrecaApp() {
       isSwitchingStation = true;
       updatePlayStateUI();
 
-      if (previewAudio) {
-        try { previewAudio.pause(); } catch (e) {}
+      if (activePreviewAudio) {
+        try { activePreviewAudio.pause(); } catch (e) {}
+        activePreviewAudio.src = "";
+        activePreviewAudio = null;
       }
       activePreviewRank = null;
       loadingPreviewRank = null;
+      previewSessionId++;
       updateChartPreviewUI();
 
       if (audioSwitchTimeout) {
@@ -3317,7 +3321,12 @@ function initGrecaApp() {
 
     // If user tapped the currently playing or loading track -> toggle it off (pause)
     if (activePreviewRank === track.rank || loadingPreviewRank === track.rank) {
-      try { previewAudio.pause(); } catch (e) {}
+      previewSessionId++;
+      if (activePreviewAudio) {
+        try { activePreviewAudio.pause(); } catch (e) {}
+        activePreviewAudio.src = "";
+        activePreviewAudio = null;
+      }
       activePreviewRank = null;
       loadingPreviewRank = null;
       updateChartPreviewUI();
@@ -3326,55 +3335,72 @@ function initGrecaApp() {
       return;
     }
 
-    // Stop existing preview immediately
-    try { previewAudio.pause(); } catch (e) {}
+    // 1. Invalidate any in-flight preview session
+    const currentSession = ++previewSessionId;
 
-    // Show loading spinner immediately (0ms visual feedback) and clear previous track's bars
+    // 2. Stop and discard previous preview audio completely
+    if (activePreviewAudio) {
+      try { activePreviewAudio.pause(); } catch (e) {}
+      activePreviewAudio.src = "";
+      activePreviewAudio = null;
+    }
+
+    // 3. Immediately show the spinning circle (0ms instant visual feedback) & clear old bars
     activePreviewRank = null;
     loadingPreviewRank = track.rank;
     updateChartPreviewUI();
 
-    previewAudio.preload = "auto";
-    previewAudio.src = track.audio;
-    try { previewAudio.load(); } catch (e) {}
+    // 4. Create a clean, isolated new Audio element for this preview track
+    const a = new Audio();
+    activePreviewAudio = a;
+    a.preload = "auto";
+    a.src = track.audio;
 
-    previewAudio.play().catch(e => {
-      console.warn("Preview playback error:", e);
-      if (loadingPreviewRank === track.rank) {
-        loadingPreviewRank = null;
-        activePreviewRank = null;
-        updateChartPreviewUI();
-      }
-    });
-  }
-
-  previewAudio.addEventListener("playing", () => {
-    if (loadingPreviewRank) {
-      activePreviewRank = loadingPreviewRank;
+    // 5. Only transition to "playing" when audio ACTUALLY begins playback with real buffered frames
+    const onStartPlaying = () => {
+      if (previewSessionId !== currentSession) return;
+      if (a.readyState < 2) return; // Prevent any premature ghost trigger!
+      activePreviewRank = track.rank;
       loadingPreviewRank = null;
       updateChartPreviewUI();
-    }
-  });
+    };
 
-  previewAudio.addEventListener("ended", () => {
-    if (loadingPreviewRank !== null) return;
-    activePreviewRank = null;
-    loadingPreviewRank = null;
-    try { previewAudio.pause(); } catch (e) {}
-    updateChartPreviewUI();
-    // Resume live radio stream fresh from the real-time live edge!
-    tuneStation(currentStationIdx, true);
-  });
+    a.addEventListener("playing", onStartPlaying);
+    a.addEventListener("timeupdate", () => {
+      if (previewSessionId === currentSession && loadingPreviewRank === track.rank && a.currentTime > 0) {
+        onStartPlaying();
+      }
+    });
 
-  previewAudio.addEventListener("error", () => {
-    if (loadingPreviewRank !== null) return;
-    activePreviewRank = null;
-    loadingPreviewRank = null;
-    try { previewAudio.pause(); } catch (e) {}
-    updateChartPreviewUI();
-    // Resume live radio stream fresh from the real-time live edge!
-    tuneStation(currentStationIdx, true);
-  });
+    a.addEventListener("ended", () => {
+      if (previewSessionId !== currentSession) return;
+      activePreviewRank = null;
+      loadingPreviewRank = null;
+      if (activePreviewAudio === a) activePreviewAudio = null;
+      updateChartPreviewUI();
+      // Resume live radio stream fresh from the real-time live edge!
+      tuneStation(currentStationIdx, true);
+    });
+
+    a.addEventListener("error", (e) => {
+      if (previewSessionId !== currentSession) return;
+      console.warn("Preview playback error:", e);
+      activePreviewRank = null;
+      loadingPreviewRank = null;
+      if (activePreviewAudio === a) activePreviewAudio = null;
+      updateChartPreviewUI();
+      tuneStation(currentStationIdx, true);
+    });
+
+    try { a.load(); } catch (e) {}
+    a.play().catch(err => {
+      if (previewSessionId !== currentSession) return;
+      console.warn("Preview play rejected:", err);
+      activePreviewRank = null;
+      loadingPreviewRank = null;
+      updateChartPreviewUI();
+    });
+  }
 
   function renderTop30Chart() {
     if (!chartTracksList) return;
