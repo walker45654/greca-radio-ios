@@ -3010,11 +3010,13 @@ html, body {
 }
 
 .chart-track-thumb:hover .chart-thumb-overlay,
-.chart-track-thumb.is-playing .chart-thumb-overlay {
+.chart-track-thumb.is-playing .chart-thumb-overlay,
+.chart-track-thumb.is-loading .chart-thumb-overlay {
   opacity: 1;
 }
 
-.chart-track-thumb.is-playing .chart-thumb-overlay {
+.chart-track-thumb.is-playing .chart-thumb-overlay,
+.chart-track-thumb.is-loading .chart-thumb-overlay {
   background: rgba(0, 0, 0, 0.44); /* Subtle dark shading so the cover logo is visible and the 2 white pause bars stand out */
 }
 
@@ -3080,6 +3082,20 @@ html, body {
   color: #FFFFFF;
   border-color: var(--greca-red);
   box-shadow: 0 2px 10px rgba(217, 0, 27, 0.35);
+}
+
+.chart-preview-btn.is-loading {
+  background: rgba(217, 0, 27, 0.12);
+  color: var(--greca-red);
+  border-color: var(--greca-red);
+}
+
+.chart-preview-btn.is-loading .chart-equalizer-mini {
+  display: none !important;
+}
+
+.chart-preview-btn.is-loading .preview-play-icon {
+  display: inline-block !important;
 }
 
 .chart-heart-btn {
