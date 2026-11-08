@@ -302,6 +302,7 @@ function initGrecaApp() {
   const chartTracksList = document.getElementById("chartTracksList");
   const previewAudio = new Audio();
   let activePreviewRank = null;
+  let loadingPreviewRank = null;
 
   // -----------------------------------------------------------------
   // Track History State (Strictly 5 items maximum PER STATION)
@@ -3245,15 +3246,36 @@ function initGrecaApp() {
         const thumb = card.querySelector(".chart-track-thumb");
         const playBtn = card.querySelector(".chart-preview-btn");
         const isThisPlaying = (activePreviewRank === r);
+        const isThisLoading = (loadingPreviewRank === r);
 
         if (thumb) {
           thumb.classList.toggle("is-playing", isThisPlaying);
+          thumb.classList.toggle("is-loading", isThisLoading);
           const overlayIcon = thumb.querySelector(".chart-thumb-overlay i");
-          if (overlayIcon) overlayIcon.className = isThisPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
+          if (overlayIcon) {
+            if (isThisLoading) {
+              overlayIcon.className = "fa-solid fa-spinner fa-spin";
+            } else if (isThisPlaying) {
+              overlayIcon.className = "fa-solid fa-pause";
+            } else {
+              overlayIcon.className = "fa-solid fa-play";
+            }
+          }
         }
 
         if (playBtn) {
           playBtn.classList.toggle("is-playing", isThisPlaying);
+          playBtn.classList.toggle("is-loading", isThisLoading);
+          const playIcon = playBtn.querySelector(".preview-play-icon");
+          if (playIcon) {
+            if (isThisLoading) {
+              playIcon.className = "fa-solid fa-spinner fa-spin preview-play-icon";
+            } else if (isThisPlaying) {
+              playIcon.className = "fa-solid fa-pause preview-play-icon";
+            } else {
+              playIcon.className = "fa-solid fa-play preview-play-icon";
+            }
+          }
         }
       });
     }
@@ -3265,9 +3287,11 @@ function initGrecaApp() {
       return;
     }
 
-    if (activePreviewRank === track.rank) {
-      previewAudio.pause();
+    if (activePreviewRank === track.rank || loadingPreviewRank === track.rank) {
+      try { previewAudio.pause(); } catch (e) {}
+      previewAudio.src = "";
       activePreviewRank = null;
+      loadingPreviewRank = null;
       updateChartPreviewUI();
       tuneStation(currentStationIdx, true);
       return;
@@ -3280,25 +3304,40 @@ function initGrecaApp() {
       updatePlayStateUI();
     }
 
-    // Instantly switch active rank & update UI so previous track stops immediately without freezing!
-    activePreviewRank = track.rank;
+    // Stop previous preview immediately
+    try { previewAudio.pause(); } catch (e) {}
+
+    // Show loading spinner immediately (0ms visual feedback) and clear previous track's bars
+    loadingPreviewRank = track.rank;
+    activePreviewRank = null;
     updateChartPreviewUI();
 
-    previewAudio.pause();
     previewAudio.preload = "auto";
     previewAudio.src = track.audio;
 
     previewAudio.play().catch(e => {
       console.warn("Preview playback error:", e);
-      if (activePreviewRank === track.rank) {
+      if (loadingPreviewRank === track.rank) {
+        loadingPreviewRank = null;
         activePreviewRank = null;
         updateChartPreviewUI();
       }
     });
   }
 
+  previewAudio.addEventListener("playing", () => {
+    if (loadingPreviewRank) {
+      activePreviewRank = loadingPreviewRank;
+      loadingPreviewRank = null;
+      updateChartPreviewUI();
+    }
+  });
+
   previewAudio.addEventListener("ended", () => {
     activePreviewRank = null;
+    loadingPreviewRank = null;
+    try { previewAudio.pause(); } catch (e) {}
+    previewAudio.src = "";
     updateChartPreviewUI();
     // Automatically start/resume the live radio station stream
     tuneStation(currentStationIdx, true);
@@ -3306,6 +3345,9 @@ function initGrecaApp() {
 
   previewAudio.addEventListener("error", () => {
     activePreviewRank = null;
+    loadingPreviewRank = null;
+    try { previewAudio.pause(); } catch (e) {}
+    previewAudio.src = "";
     updateChartPreviewUI();
   });
 
