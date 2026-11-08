@@ -861,16 +861,17 @@ function initGrecaApp() {
     if (stationsBubbleRow) {
       const bubbles = stationsBubbleRow.querySelectorAll(".station-bubble-item");
       bubbles.forEach((b, idx) => {
-        if (idx === currentStationIdx) {
-          b.classList.add("active-bubble");
-          if (isPlaying) {
-            b.classList.add("is-playing-bubble");
+        const isCurrent = (idx === currentStationIdx);
+        b.classList.toggle("active-bubble", isCurrent);
+        b.classList.toggle("is-playing-bubble", isCurrent && isPlaying);
+        b.classList.toggle("is-buffering-bubble", isCurrent && isBuffering);
+        const liveTag = b.querySelector(".bubble-live-tag");
+        if (liveTag) {
+          if (isCurrent && isBuffering) {
+            liveTag.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:7px;"></i>';
           } else {
-            b.classList.remove("is-playing-bubble");
+            liveTag.innerText = 'LIVE';
           }
-        } else {
-          b.classList.remove("active-bubble");
-          b.classList.remove("is-playing-bubble");
         }
       });
     }
@@ -2190,8 +2191,7 @@ function initGrecaApp() {
         activePreviewRank = null;
         loadingPreviewRank = null;
         try { previewAudio.pause(); } catch (e) {}
-        previewAudio.removeAttribute("src");
-        try { previewAudio.load(); } catch (e) {}
+        previewAudio.src = "";
         updateChartPreviewUI();
       }
 
@@ -2236,10 +2236,8 @@ function initGrecaApp() {
       if (playPromise !== undefined) {
         playPromise.then(() => {
           if (thisTuneId !== currentTuneId) return;
-          isSwitchingStation = false;
-          isBuffering = false;
+          // CRITICAL: Keep isBuffering = true until the 'playing' event fires so user SEES the loading circle!
           isPlaying = true;
-          if (bufferTimeout) { clearTimeout(bufferTimeout); bufferTimeout = null; }
           updatePlayStateUI();
         }).catch(err => {
           if (thisTuneId !== currentTuneId) return;
@@ -2272,8 +2270,7 @@ function initGrecaApp() {
     } else {
       isSwitchingStation = false;
       try { audio.pause(); } catch (e) {}
-      audio.removeAttribute("src");
-      try { audio.load(); } catch (e) {}
+      audio.src = "";
       isBuffering = false;
       isPlaying = false;
       updatePlayStateUI();
@@ -2344,18 +2341,6 @@ function initGrecaApp() {
 
   audio.addEventListener("canplay", () => {
     isSwitchingStation = false;
-    if (isPlaying && !audio.paused) {
-      isBuffering = false;
-      if (bufferTimeout) {
-        clearTimeout(bufferTimeout);
-        bufferTimeout = null;
-      }
-      if (waitingWatchdog) {
-        clearTimeout(waitingWatchdog);
-        waitingWatchdog = null;
-      }
-      updatePlayStateUI();
-    }
   });
 
   audio.addEventListener("timeupdate", () => {
@@ -3298,8 +3283,7 @@ function initGrecaApp() {
       activePreviewRank = null;
       loadingPreviewRank = null;
       try { previewAudio.pause(); } catch (e) {}
-      previewAudio.removeAttribute("src");
-      try { previewAudio.load(); } catch (e) {}
+      previewAudio.src = "";
       updateChartPreviewUI();
       tuneStation(currentStationIdx, true);
       return;
@@ -3323,35 +3307,31 @@ function initGrecaApp() {
     }
     updateChartPreviewUI();
 
-    // 2. Stop main live radio stream cleanly and yield audio hardware session to preview
+    // 2. Pause main live radio stream cleanly without wiping its source
     if (isPlaying || (audio && !audio.paused)) {
       try { audio.pause(); } catch (e) {}
-      audio.removeAttribute("src");
-      try { audio.load(); } catch (e) {}
       isPlaying = false;
       isBuffering = false;
       updatePlayStateUI();
     }
 
-    // 3. Audio setup in requestAnimationFrame so the browser paints the spinner with 0ms delay!
-    requestAnimationFrame(() => {
-      try { previewAudio.pause(); } catch (e) {}
-      previewAudio.removeAttribute("src");
-      try { previewAudio.load(); } catch (e) {}
-      previewAudio.preload = "auto";
-      previewAudio.src = track.audio;
+    // 3. Start preview audio SYNCHRONOUSLY directly inside the user click gesture!
+    try { previewAudio.pause(); } catch (e) {}
+    previewAudio.preload = "auto";
+    previewAudio.src = track.audio;
 
-      previewAudio.play().catch(e => {
+    const prevPromise = previewAudio.play();
+    if (prevPromise !== undefined) {
+      prevPromise.catch(e => {
         console.warn("Preview playback error:", e);
         if (loadingPreviewRank === track.rank) {
           loadingPreviewRank = null;
           activePreviewRank = null;
-          previewAudio.removeAttribute("src");
-          try { previewAudio.load(); } catch (err) {}
+          previewAudio.src = "";
           updateChartPreviewUI();
         }
       });
-    });
+    }
   }
 
   previewAudio.addEventListener("playing", () => {
@@ -3363,24 +3343,20 @@ function initGrecaApp() {
   });
 
   previewAudio.addEventListener("pause", () => {
-    if (loadingPreviewRank === null && activePreviewRank !== null) {
+    if (loadingPreviewRank === null && activePreviewRank !== null && previewAudio.paused) {
       activePreviewRank = null;
       updateChartPreviewUI();
     }
   });
 
   previewAudio.addEventListener("ended", () => {
-    const wasPlaying = (activePreviewRank !== null);
     activePreviewRank = null;
     loadingPreviewRank = null;
     try { previewAudio.pause(); } catch (e) {}
-    previewAudio.removeAttribute("src");
-    try { previewAudio.load(); } catch (e) {}
+    previewAudio.src = "";
     updateChartPreviewUI();
     // Automatically start/resume the live radio station stream FRESH on the live broadcast!
-    if (wasPlaying) {
-      tuneStation(currentStationIdx, true);
-    }
+    tuneStation(currentStationIdx, true);
   });
 
   previewAudio.addEventListener("error", (e) => {
@@ -3388,8 +3364,7 @@ function initGrecaApp() {
     activePreviewRank = null;
     loadingPreviewRank = null;
     try { previewAudio.pause(); } catch (err) {}
-    previewAudio.removeAttribute("src");
-    try { previewAudio.load(); } catch (err) {}
+    previewAudio.src = "";
     updateChartPreviewUI();
   });
 
@@ -3596,7 +3571,9 @@ function initGrecaApp() {
         try {
           localStorage.setItem("greca_cached_top30", JSON.stringify(tracks));
         } catch (e) {}
-        renderTop30Chart();
+        if (activePreviewRank === null && loadingPreviewRank === null) {
+          renderTop30Chart();
+        }
       }
     } catch (e) {
       console.warn("Chart fetch error:", e);
@@ -3898,8 +3875,7 @@ function initGrecaApp() {
       activePreviewRank = null;
       loadingPreviewRank = null;
       try { previewAudio.pause(); } catch (e) {}
-      previewAudio.removeAttribute("src");
-      try { previewAudio.load(); } catch (e) {}
+      previewAudio.src = "";
       updateChartPreviewUI();
       // Resume the live radio stream
       tuneStation(currentStationIdx, true);
