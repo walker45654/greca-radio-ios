@@ -3985,12 +3985,12 @@ function initGrecaApp() {
   // -----------------------------------------------------------------
   try {
     // Global Native iOS Image Drag, Callout & Selection Prevention
-    window.addEventListener("dragstart", (e) => e.preventDefault());
+    window.addEventListener("dragstart", (e) => e.preventDefault(), true);
     window.addEventListener("contextmenu", (e) => {
-      if (e.target && (e.target.tagName === "IMG" || e.target.closest("img"))) {
+      if (e.target && (e.target.tagName === "IMG" || (e.target.closest && e.target.closest("img")))) {
         e.preventDefault();
       }
-    });
+    }, true);
     document.querySelectorAll("img").forEach(img => {
       img.setAttribute("draggable", "false");
     });
