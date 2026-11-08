@@ -2205,6 +2205,7 @@ function initGrecaApp() {
 
       // Fast synchronous stream attachment for iOS (keeps User Activation flag active!)
       if (audio.src !== channel.streamUrl) {
+        audio.preload = "auto";
         audio.src = channel.streamUrl;
       }
       isSwitchingStation = false;
@@ -3919,12 +3920,10 @@ function initGrecaApp() {
   // INITIALIZATION (0ms Instant Render + Background Live Polling)
   // -----------------------------------------------------------------
   try {
-    // 0. Pre-arm primary audio stream for instant zero-lag playback on first touch!
-    if (audio && DATA && DATA.channels && DATA.channels[0]) {
-      try {
-        audio.preload = "auto";
-        audio.src = DATA.channels[0].streamUrl;
-      } catch (e) {}
+    // 0. Clean audio setup on launch: 0 stream connections, 0 listeners counted until user presses Play!
+    if (audio) {
+      audio.preload = "none";
+      audio.src = "";
     }
 
     // 1. Instant Synchronous UI Population (0ms!)
