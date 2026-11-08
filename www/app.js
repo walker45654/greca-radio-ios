@@ -3276,47 +3276,32 @@ function initGrecaApp() {
   }
 
   function updateChartPreviewUI() {
-    if (chartTracksList) {
-      chartTracksList.querySelectorAll(".chart-track-card").forEach(card => {
-        const r = parseInt(card.dataset.rank, 10);
-        const thumb = card.querySelector(".chart-track-thumb");
-        const playBtn = card.querySelector(".chart-preview-btn");
-        const isThisPlaying = (activePreviewRank === r);
-        const isThisLoading = (loadingPreviewRank === r);
+    if (!chartTracksList) return;
+    chartTracksList.querySelectorAll(".chart-track-card").forEach(card => {
+      const r = parseInt(card.dataset.rank, 10);
+      const isThisPlaying = (activePreviewRank === r);
+      const isThisLoading = (loadingPreviewRank === r);
 
-        if (thumb) {
-          if (thumb.classList.contains("is-playing") !== isThisPlaying) {
-            thumb.classList.toggle("is-playing", isThisPlaying);
-          }
-          if (thumb.classList.contains("is-loading") !== isThisLoading) {
-            thumb.classList.toggle("is-loading", isThisLoading);
-          }
-          const overlayIcon = thumb.querySelector(".chart-thumb-overlay i");
-          if (overlayIcon) {
-            const targetClass = isThisLoading ? "fa-solid fa-spinner fa-spin" : (isThisPlaying ? "fa-solid fa-pause" : "fa-solid fa-play");
-            if (overlayIcon.className !== targetClass) {
-              overlayIcon.className = targetClass;
-            }
-          }
+      const thumb = card.querySelector(".chart-track-thumb");
+      if (thumb) {
+        if (thumb.classList.contains("is-playing") !== isThisPlaying) {
+          thumb.classList.toggle("is-playing", isThisPlaying);
         }
+        if (thumb.classList.contains("is-loading") !== isThisLoading) {
+          thumb.classList.toggle("is-loading", isThisLoading);
+        }
+      }
 
-        if (playBtn) {
-          if (playBtn.classList.contains("is-playing") !== isThisPlaying) {
-            playBtn.classList.toggle("is-playing", isThisPlaying);
-          }
-          if (playBtn.classList.contains("is-loading") !== isThisLoading) {
-            playBtn.classList.toggle("is-loading", isThisLoading);
-          }
-          const playIcon = playBtn.querySelector(".preview-play-icon");
-          if (playIcon) {
-            const targetPlayClass = isThisLoading ? "fa-solid fa-spinner fa-spin preview-play-icon" : (isThisPlaying ? "fa-solid fa-pause preview-play-icon" : "fa-solid fa-play preview-play-icon");
-            if (playIcon.className !== targetPlayClass) {
-              playIcon.className = targetPlayClass;
-            }
-          }
+      const playBtn = card.querySelector(".chart-preview-btn");
+      if (playBtn) {
+        if (playBtn.classList.contains("is-playing") !== isThisPlaying) {
+          playBtn.classList.toggle("is-playing", isThisPlaying);
         }
-      });
-    }
+        if (playBtn.classList.contains("is-loading") !== isThisLoading) {
+          playBtn.classList.toggle("is-loading", isThisLoading);
+        }
+      }
+    });
   }
 
   function toggleTrackPreview(track) {
@@ -3325,8 +3310,10 @@ function initGrecaApp() {
       return;
     }
 
-    // Always stop live radio stream completely so it never plays concurrently
-    stopLiveRadio();
+    // Only pause live radio if it was actually playing or buffering
+    if (isPlaying || isBuffering || (audio && !audio.paused)) {
+      stopLiveRadio();
+    }
 
     // If user tapped the currently playing or loading track -> toggle it off (pause)
     if (activePreviewRank === track.rank || loadingPreviewRank === track.rank) {
@@ -3349,6 +3336,7 @@ function initGrecaApp() {
 
     previewAudio.preload = "auto";
     previewAudio.src = track.audio;
+    try { previewAudio.load(); } catch (e) {}
 
     previewAudio.play().catch(e => {
       console.warn("Preview playback error:", e);
@@ -3410,7 +3398,9 @@ function initGrecaApp() {
           <img src="${item.image || 'assets/stations/main.png'}" alt="${item.title}" onerror="this.src='assets/stations/main.png'">
           ${item.audio ? `
             <div class="chart-thumb-overlay">
-              <i class="fa-solid fa-play"></i>
+              <i class="fa-solid fa-play thumb-play-icon"></i>
+              <i class="fa-solid fa-pause thumb-pause-icon"></i>
+              <div class="chart-thumb-spinner"></div>
             </div>
           ` : ''}
         </div>
@@ -3422,6 +3412,7 @@ function initGrecaApp() {
           ${item.audio ? `
             <button class="chart-preview-btn" aria-label="Αναπαραγωγή δείγματος" title="Ακρόαση δείγματος">
               <i class="fa-solid fa-play preview-play-icon"></i>
+              <div class="chart-btn-spinner"></div>
               <div class="chart-equalizer-mini">
                 <span></span><span></span><span></span>
               </div>
